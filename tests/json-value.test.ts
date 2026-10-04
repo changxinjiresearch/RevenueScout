@@ -11,7 +11,8 @@ describe("jsonArrayValue", () => {
   });
 
   it("parses a double-encoded JSON array defensively", () => {
-    expect(jsonArrayValue('"[{\"id\":1}]"')).toEqual([{ id: 1 }]);
+    const encoded = JSON.stringify(JSON.stringify([{ id: 1 }]));
+    expect(jsonArrayValue(encoded)).toEqual([{ id: 1 }]);
   });
 
   it("returns an empty array for invalid values", () => {
