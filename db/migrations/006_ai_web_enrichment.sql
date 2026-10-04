@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS company_research_runs (
   risks TEXT[] NOT NULL DEFAULT '{}',
   recommended_contact_role TEXT,
   next_action TEXT,
+  structured_result JSONB,
   raw_response JSONB,
   error_message TEXT,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
