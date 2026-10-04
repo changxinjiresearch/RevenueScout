@@ -104,6 +104,11 @@ Status: **completed**
 - missing external fields remain explicitly missing; RevenueScout does not
   invent industry, headcount or buying signals
 - synthetic fixtures remain only for signed-out demo mode
+- automatic public-web enrichment using the Responses API web-search tool
+- AI research compares each company against the active ICP and Offering
+- source-grounded observations are persisted as Evidence / Buying Signals
+- high-confidence company facts can be auto-filled while uncertain facts remain estimates
+- fast-review UI shows commercial potential, a conservative pre-contact conversion estimate, why-fit, why-now, risks, recommended contact and next action
 
 Exit gate: **passed**. Companies can enter RevenueScout from a real external source or
 manual creation, duplicates are controlled, every buying signal points to stored
