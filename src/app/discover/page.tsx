@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
+import { jsonArrayValue } from "@/lib/db/json-value";
 import { listDiscoveryProviders } from "@/lib/discovery/providers";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
 
@@ -17,7 +18,7 @@ type DiscoveryRun = {
   status: string;
   resultCount: number;
   importedCount: number;
-  results: DiscoveryCandidate[];
+  results: unknown;
   errorMessage: string | null;
   createdAt: Date;
 };
@@ -65,7 +66,9 @@ export default async function DiscoverPage({
         AND organization_id = ${user.organizationId}
       LIMIT 1
     `;
-    run = found ?? null;
+    run = found
+      ? { ...found, results: jsonArrayValue<DiscoveryCandidate>(found.results) }
+      : null;
   }
 
   const providers = listDiscoveryProviders();
