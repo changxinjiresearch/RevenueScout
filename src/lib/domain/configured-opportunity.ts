@@ -74,9 +74,11 @@ export interface IcpMatch {
   icpId: string;
   icpName: string;
   score: number;
+  qualified: boolean;
   excluded: boolean;
   reasons: string[];
   mismatches: string[];
+  qualificationFailures: string[];
   exclusionReasons: string[];
 }
 
@@ -107,6 +109,7 @@ export function evaluateIcp(
   icp: IcpRule,
 ): IcpMatch {
   const exclusionReasons: string[] = [];
+  const qualificationFailures: string[] = [];
 
   if (icp.excludeGovernment && company.entityType === "GOVERNMENT") {
     exclusionReasons.push("Government organisations are excluded");
@@ -151,7 +154,7 @@ export function evaluateIcp(
   const reasons: string[] = [];
   const mismatches: string[] = [];
 
-  const criterion = (
+  const qualificationGate = (
     configured: boolean,
     passed: boolean,
     weight: number,
@@ -160,6 +163,25 @@ export function evaluateIcp(
   ) => {
     if (!configured) return;
     possible += weight;
+
+    if (passed) {
+      earned += weight;
+      reasons.push(success);
+    } else {
+      qualificationFailures.push(failure);
+    }
+  };
+
+  const preferenceCriterion = (
+    configured: boolean,
+    passed: boolean,
+    weight: number,
+    success: string,
+    failure: string,
+  ) => {
+    if (!configured) return;
+    possible += weight;
+
     if (passed) {
       earned += weight;
       reasons.push(success);
@@ -168,42 +190,45 @@ export function evaluateIcp(
     }
   };
 
-  criterion(
+  // Base company profile is a qualification gate. A company that misses one
+  // of these explicitly configured boundaries cannot compensate with softer
+  // signals such as hiring, growth or technology.
+  qualificationGate(
     icp.countries.length > 0,
     includesValue(icp.countries, company.country),
     15,
     `Country matches: ${company.country}`,
     "Country does not match target countries",
   );
-  criterion(
+  qualificationGate(
     icp.states.length > 0,
     includesValue(icp.states, company.state),
     8,
     `State matches: ${company.state}`,
     "State does not match target regions",
   );
-  criterion(
+  qualificationGate(
     icp.cities.length > 0,
     includesValue(icp.cities, company.city),
     5,
     `City matches: ${company.city}`,
     "City does not match target cities",
   );
-  criterion(
+  qualificationGate(
     icp.industries.length > 0,
     includesValue(icp.industries, company.industry),
     18,
     `Industry matches: ${company.industry}`,
     "Industry does not match target industries",
   );
-  criterion(
+  qualificationGate(
     icp.subindustries.length > 0,
     includesValue(icp.subindustries, company.subindustry),
     7,
     `Subindustry matches: ${company.subindustry}`,
-    "Subindustry does not match",
+    "Subindustry does not match target subindustries",
   );
-  criterion(
+  qualificationGate(
     icp.employeeMin !== null || icp.employeeMax !== null,
     (icp.employeeMin === null || company.employeeCount >= icp.employeeMin) &&
       (icp.employeeMax === null || company.employeeCount <= icp.employeeMax),
@@ -211,7 +236,7 @@ export function evaluateIcp(
     `Employee count ${company.employeeCount} is in range`,
     "Employee count is outside the target range",
   );
-  criterion(
+  qualificationGate(
     icp.companyAgeMin !== null || icp.companyAgeMax !== null,
     (icp.companyAgeMin === null || company.companyAgeYears >= icp.companyAgeMin) &&
       (icp.companyAgeMax === null || company.companyAgeYears <= icp.companyAgeMax),
@@ -219,40 +244,73 @@ export function evaluateIcp(
     "Company age is in range",
     "Company age is outside the target range",
   );
-  criterion(
+  qualificationGate(
     icp.companyTypes.length > 0,
     includesValue(icp.companyTypes, company.companyType),
     6,
     `Company type matches: ${company.companyType}`,
     "Company type does not match",
   );
-  criterion(
+  qualificationGate(
     icp.serviceRegions.length > 0,
     intersects(icp.serviceRegions, company.serviceRegions),
     6,
     "Service region overlaps the ICP",
     "Service region does not overlap the ICP",
   );
-  criterion(icp.fastGrowth, company.fastGrowth, 4, "Rapid growth matches", "Rapid growth not observed");
-  criterion(icp.multiLocation, company.multiLocation, 4, "Multi-location operation matches", "Multi-location operation not observed");
-  criterion(icp.hiring, company.hiring, 4, "Active hiring matches", "Active hiring not observed");
-  criterion(icp.recentFunding, company.recentFunding, 4, "Recent funding matches", "Recent funding not observed");
-  criterion(icp.digitalNeed, company.digitalNeed, 4, "Digitalisation need matches", "Digitalisation need not observed");
-  criterion(
+
+  // Dynamic / preference conditions improve fit but never rescue a company
+  // that failed the base qualification gate above.
+  preferenceCriterion(
+    icp.fastGrowth,
+    company.fastGrowth,
+    4,
+    "Rapid growth matches",
+    "Rapid growth not observed",
+  );
+  preferenceCriterion(
+    icp.multiLocation,
+    company.multiLocation,
+    4,
+    "Multi-location operation matches",
+    "Multi-location operation not observed",
+  );
+  preferenceCriterion(
+    icp.hiring,
+    company.hiring,
+    4,
+    "Active hiring matches",
+    "Active hiring not observed",
+  );
+  preferenceCriterion(
+    icp.recentFunding,
+    company.recentFunding,
+    4,
+    "Recent funding matches",
+    "Recent funding not observed",
+  );
+  preferenceCriterion(
+    icp.digitalNeed,
+    company.digitalNeed,
+    4,
+    "Digitalisation need matches",
+    "Digitalisation need not observed",
+  );
+  preferenceCriterion(
     icp.requiredRoles.length > 0,
     intersects(icp.requiredRoles, company.roles),
     5,
     "Relevant decision-making role exists",
     "Required role not observed",
   );
-  criterion(
+  preferenceCriterion(
     icp.businessModels.length > 0,
     intersects(icp.businessModels, company.businessModels),
     5,
     "Business model matches",
     "Business model does not match",
   );
-  criterion(
+  preferenceCriterion(
     icp.technologies.length > 0,
     intersects(icp.technologies, company.technologies),
     5,
@@ -264,28 +322,34 @@ export function evaluateIcp(
     reasons.push("Manual exclusion notes exist and remain visible for human review");
   }
 
+  const qualified = qualificationFailures.length === 0;
+  const excluded = exclusionReasons.length > 0;
+
   return {
     icpId: icp.id,
     icpName: icp.name,
     score:
-      exclusionReasons.length > 0 || possible === 0
+      excluded || !qualified || possible === 0
         ? 0
         : Math.round((earned / possible) * 100),
-    excluded: exclusionReasons.length > 0,
+    qualified,
+    excluded,
     reasons,
     mismatches,
+    qualificationFailures,
     exclusionReasons,
   };
 }
-
 export function findBestIcp(
   company: CandidateCompanyFacts,
   icps: IcpRule[],
 ): IcpMatch | null {
   const matches = icps.map((icp) => evaluateIcp(company, icp));
-  const eligible = matches.filter((match) => !match.excluded);
-  const pool = eligible.length > 0 ? eligible : matches;
-  return pool.sort((a, b) => b.score - a.score)[0] ?? null;
+  const eligible = matches.filter(
+    (match) => match.qualified && !match.excluded,
+  );
+
+  return eligible.sort((a, b) => b.score - a.score)[0] ?? null;
 }
 
 function chooseDealValue(
@@ -317,7 +381,7 @@ export function configureOpportunity(
   links: OfferingIcpLink[],
 ): ConfiguredOpportunity | null {
   const matchedIcp = findBestIcp(company, icps);
-  if (!matchedIcp || matchedIcp.excluded) return null;
+  if (!matchedIcp || !matchedIcp.qualified || matchedIcp.excluded) return null;
 
   const linkedOfferingIds = new Set(
     links
