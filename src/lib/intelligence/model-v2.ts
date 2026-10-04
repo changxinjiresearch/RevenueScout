@@ -804,7 +804,7 @@ export function runConversionModelV2(input: {
     input.offerings,
   );
 
-  const evidenceConfidence = evidenceConfidenceScore(
+  const baseEvidenceConfidence = evidenceConfidenceScore(
     input.validation,
     bestIcp.completeness,
     input.collector,
@@ -856,6 +856,25 @@ export function runConversionModelV2(input: {
   const unknownDimensions = dimensions
     .filter((dimension) => dimension.value === null)
     .map((dimension) => dimension.label);
+
+  const totalDimensionWeight = dimensions.reduce(
+    (sum, dimension) => sum + dimension.weight,
+    0,
+  );
+  const knownDimensionWeight = dimensions
+    .filter((dimension) => dimension.value !== null)
+    .reduce((sum, dimension) => sum + dimension.weight, 0);
+  const dimensionCoverage =
+    totalDimensionWeight > 0
+      ? knownDimensionWeight / totalDimensionWeight
+      : 0;
+
+  const evidenceConfidence = Math.round(
+    clamp(
+      baseEvidenceConfidence *
+        (0.45 + 0.55 * dimensionCoverage),
+    ),
+  );
 
   const potential = boundedPotential(dimensions, bestIcp);
 
