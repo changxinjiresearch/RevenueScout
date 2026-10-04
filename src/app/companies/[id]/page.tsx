@@ -425,15 +425,9 @@ export default async function CompanyIntelligencePage({
           <>
             <div className="ai-score-row">
               <div>
-                <span>Commercial potential</span>
+                <span>Potential</span>
                 <strong>
                   {researchRun.structuredResult.overallPotentialScore}/100
-                </strong>
-              </div>
-              <div>
-                <span>Estimated conversion likelihood</span>
-                <strong>
-                  {researchRun.structuredResult.estimatedConversionPercent}%
                 </strong>
               </div>
               <div>
@@ -443,8 +437,46 @@ export default async function CompanyIntelligencePage({
                 </strong>
               </div>
               <div>
-                <span>Sources checked</span>
-                <strong>{researchRun.sourceCount}</strong>
+                <span>Potential range</span>
+                <strong>
+                  {researchRun.structuredResult.potentialConservativeScore}–
+                  {researchRun.structuredResult.potentialUpsideScore}
+                </strong>
+              </div>
+              <div>
+                <span>Recommended mode</span>
+                <strong>
+                  {priorityActionText(
+                    researchRun.structuredResult.priorityAction,
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <div className="ai-score-row secondary-score-row">
+              <div>
+                <span>Sales priority</span>
+                <strong>
+                  {researchRun.structuredResult.salesPriorityScore}/100
+                </strong>
+              </div>
+              <div>
+                <span>Research priority</span>
+                <strong>
+                  {researchRun.structuredResult.researchPriorityScore}/100
+                </strong>
+              </div>
+              <div>
+                <span>Value of information</span>
+                <strong>
+                  {researchRun.structuredResult.valueOfInformationScore}/100
+                </strong>
+              </div>
+              <div>
+                <span>Conversion estimate</span>
+                <strong>
+                  {researchRun.structuredResult.estimatedConversionPercent}%
+                </strong>
               </div>
             </div>
 
@@ -453,8 +485,33 @@ export default async function CompanyIntelligencePage({
                 {researchRun.structuredResult.assessmentSummary}
               </strong>
               <p>
-                Pre-contact estimate from RS Conversion Model v2. It is deterministic and not yet calibrated against historical Won/Lost outcomes.
+                Unknown is not treated as negative. Potential is calculated
+                from known dimensions; confidence and the conservative/upside
+                range describe how uncertain that estimate still is.
               </p>
+            </div>
+
+            <div className="claim-validation-summary">
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.confirmedCount}</strong>
+                Confirmed
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.corroboratedCount}</strong>
+                Corroborated
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.singleSourceCount}</strong>
+                Single-source
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.conflictedCount}</strong>
+                Conflicted
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.independentFamilyCount}</strong>
+                Independent families
+              </span>
             </div>
 
             <div className="ai-insight-grid">
@@ -520,6 +577,44 @@ export default async function CompanyIntelligencePage({
               <span className="field-label">Recommended next action</span>
               <strong>{researchRun.structuredResult.nextAction}</strong>
             </div>
+
+            <details className="claim-validation-details" open>
+              <summary>
+                Cross-validated claims (
+                {researchRun.structuredResult.validatedClaims.length})
+              </summary>
+              <div className="claim-list">
+                {researchRun.structuredResult.validatedClaims
+                  .slice(0, 12)
+                  .map((claim) => (
+                    <article
+                      className="claim-item"
+                      key={`${claim.claimType}:${claim.claimKey}`}
+                    >
+                      <div className="claim-item-top">
+                        <strong>{claim.claimType.replaceAll("_", " ")}</strong>
+                        <span className={`claim-status claim-${claim.status.toLowerCase().replaceAll("_", "-")}`}>
+                          {claimStatusText(claim.status)}
+                        </span>
+                      </div>
+                      <p>{claim.explanation}</p>
+                      <div className="claim-meta">
+                        <span>Confidence {Math.round(claim.confidence * 100)}%</span>
+                        <span>
+                          {claim.supportingFamilyCount} supporting independent
+                          family/families
+                        </span>
+                        {claim.conflictingFamilyCount > 0 ? (
+                          <span>
+                            {claim.conflictingFamilyCount} conflicting
+                            family/families
+                          </span>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+              </div>
+            </details>
 
             {researchRun.sourceUrls.length > 0 ? (
               <details className="ai-sources">
