@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
+import { jsonArrayValue } from "@/lib/db/json-value";
 import { listDiscoveryProviders } from "@/lib/discovery/providers";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
 
@@ -20,6 +21,10 @@ type DiscoveryRun = {
   results: DiscoveryCandidate[];
   errorMessage: string | null;
   createdAt: Date;
+};
+
+type DiscoveryRunRow = Omit<DiscoveryRun, "results"> & {
+  results: unknown;
 };
 
 export default async function DiscoverPage({
@@ -47,7 +52,7 @@ export default async function DiscoverPage({
   let run: DiscoveryRun | null = null;
 
   if (params.run) {
-    const [found] = await sql<DiscoveryRun[]>`
+    const [found] = await sql<DiscoveryRunRow[]>`
       SELECT
         id,
         provider,
@@ -65,7 +70,9 @@ export default async function DiscoverPage({
         AND organization_id = ${user.organizationId}
       LIMIT 1
     `;
-    run = found ?? null;
+    run = found
+      ? { ...found, results: jsonArrayValue<DiscoveryCandidate>(found.results) }
+      : null;
   }
 
   const providers = listDiscoveryProviders();
