@@ -61,6 +61,12 @@ type Identifier = {
   provider: string | null;
 };
 
+type ResearchRun = {
+  id: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  model: string;
+};
+
 function triageText(status: string) {
   if (status === "HIGH_POTENTIAL") return "High potential";
   if (status === "MEDIUM_POTENTIAL") return "Medium potential";
