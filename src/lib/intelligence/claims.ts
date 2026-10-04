@@ -4,6 +4,7 @@ export type ClaimType =
   | "EMPLOYEE_RANGE"
   | "SERVICE_REGION"
   | "BUSINESS_MODEL"
+  | "TECHNOLOGY_USE"
   | "TECHNOLOGY"
   | "DECISION_ROLE"
   | "HIRING"
