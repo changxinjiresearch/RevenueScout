@@ -86,6 +86,24 @@ function triageClass(status: string) {
   return "triage-review";
 }
 
+function priorityActionText(action: WebResearchResult["priorityAction"]) {
+  if (action === "CONTACT_NOW") return "Contact now";
+  if (action === "INVESTIGATE_URGENTLY") return "Investigate urgently";
+  if (action === "REVIEW") return "Human review";
+  if (action === "GATHER_MORE_DATA") return "Gather more data";
+  if (action === "REJECT") return "Reject";
+  return "Deprioritise research";
+}
+
+function claimStatusText(status: string) {
+  if (status === "CONFIRMED") return "Confirmed";
+  if (status === "CORROBORATED") return "Corroborated";
+  if (status === "SINGLE_SOURCE") return "Single source";
+  if (status === "CONFLICTED") return "Conflicted";
+  if (status === "STALE") return "Stale";
+  return "Unknown";
+}
+
 export default async function CompanyIntelligencePage({
   params,
   searchParams,
@@ -278,7 +296,7 @@ export default async function CompanyIntelligencePage({
     FROM web_enrichment_runs
     WHERE company_id = ${id}
       AND organization_id = ${user.organizationId}
-      AND engine = 'REVENUESCOUT_INTELLIGENCE_V1'
+      AND engine = 'REVENUESCOUT_INTELLIGENCE_V2'
     ORDER BY created_at DESC
     LIMIT 1
   `;
@@ -372,7 +390,7 @@ export default async function CompanyIntelligencePage({
             <div className="eyebrow">RevenueScout Intelligence Engine</div>
             <h2>Zero-cost company analysis</h2>
             <p>
-              RevenueScout collects public company pages, extracts company facts and buying signals, then scores them with the built-in RS Conversion Model v1. No paid AI API is used.
+              RevenueScout collects public company pages, extracts company facts and buying signals, then scores them with the built-in RS Conversion Model v2. No paid AI API is used.
             </p>
           </div>
           <form action={`/api/companies/${id}/research`} method="post">
@@ -435,7 +453,7 @@ export default async function CompanyIntelligencePage({
                 {researchRun.structuredResult.assessmentSummary}
               </strong>
               <p>
-                Pre-contact estimate from RS Conversion Model v1. It is deterministic and not yet calibrated against historical Won/Lost outcomes.
+                Pre-contact estimate from RS Conversion Model v2. It is deterministic and not yet calibrated against historical Won/Lost outcomes.
               </p>
             </div>
 
