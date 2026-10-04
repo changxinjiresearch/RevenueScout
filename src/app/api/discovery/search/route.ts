@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       SET
         status = 'COMPLETED',
         result_count = ${results.length},
-        results = ${JSON.stringify(results)}::jsonb,
+        results = ${JSON.stringify(results)}::text::jsonb,
         completed_at = NOW()
       WHERE id = ${run.id}
     `;
