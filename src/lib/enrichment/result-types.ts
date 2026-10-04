@@ -34,6 +34,8 @@ export type WebResearchResult = {
   timingScore: number;
   needScore: number;
   evidenceConfidence: number;
+  overallPotentialScore: number;
+  estimatedConversionPercent: number;
   assessmentSummary: string;
   whyFit: string[];
   whyNow: string[];
