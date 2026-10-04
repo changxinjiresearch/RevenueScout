@@ -73,7 +73,6 @@ export function sourceWasRetrieved(
 }
 
 export async function runCompanyEnrichment(
-  apiKey: string,
   context: unknown,
 ): Promise<{
   result: WebResearchResult;
@@ -81,8 +80,13 @@ export async function runCompanyEnrichment(
   rawResponse: ResearchResponsePayload;
   model: string;
 }> {
+  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error("Company enrichment is not configured.");
+  }
+
   const model =
-    process.env.OPENAI_ENRICHMENT_MODEL?.trim() || "gpt-6-luna";
+    process.env.OPENAI_ENRICHMENT_MODEL?.trim() || "gpt-5.6";
 
   const response = await fetch(RESPONSES_ENDPOINT, {
     method: "POST",
