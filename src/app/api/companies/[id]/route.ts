@@ -68,6 +68,7 @@ export async function POST(
       name_key = ${normaliseCompanyName(displayName)},
       website = ${website},
       domain = ${normaliseDomain(website)},
+      logo_url = ${String(formData.get("logoUrl") ?? "").trim() || null},
       description = ${String(formData.get("description") ?? "").trim() || null},
       country = ${String(formData.get("country") ?? "").trim() || null},
       state = ${String(formData.get("state") ?? "").trim() || null},
