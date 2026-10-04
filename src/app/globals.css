@@ -743,3 +743,373 @@ textarea:focus {
     flex-direction: column;
   }
 }
+
+
+/* M1 completion: onboarding, roles and configured decisions */
+select {
+  width: 100%;
+  border: 1px solid #dbe2ed;
+  border-radius: 12px;
+  background: #fff;
+  padding: 11px 12px;
+  color: #172033;
+}
+
+.secondary-button {
+  border: 1px solid #d5ddea;
+  border-radius: 10px;
+  background: #fff;
+  color: #3d4c67;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.primary-link {
+  display: inline-block;
+  border-radius: 12px;
+  background: #172033;
+  color: #fff;
+  padding: 11px 15px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.onboarding-shell {
+  width: min(900px, calc(100% - 40px));
+  margin: 0 auto;
+  padding: 0 0 60px;
+}
+
+.onboarding-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px 0;
+  color: #7b8598;
+  font-size: 12px;
+}
+
+.onboarding-progress-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 30px;
+  align-items: end;
+  padding: 42px 0 20px;
+}
+
+.onboarding-progress-card h1 {
+  max-width: 760px;
+  font-size: clamp(38px, 6vw, 58px);
+}
+
+.onboarding-progress-card p {
+  max-width: 680px;
+  color: #6f798d;
+  line-height: 1.6;
+}
+
+.progress-count {
+  min-width: 100px;
+  text-align: right;
+}
+
+.progress-count strong,
+.progress-count span {
+  display: block;
+}
+
+.progress-count strong {
+  font-size: 28px;
+}
+
+.progress-count span {
+  color: #8590a3;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.progress-track {
+  height: 7px;
+  margin-bottom: 30px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e7ebf2;
+}
+
+.progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #3157c8;
+  transition: width 180ms ease;
+}
+
+.onboarding-step {
+  padding: 22px 0;
+}
+
+.step-heading {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  margin-bottom: 18px;
+}
+
+.step-heading .eyebrow,
+.step-heading h2 {
+  margin-bottom: 0;
+}
+
+.helper-box,
+.blocked-card {
+  border-radius: 12px;
+  background: #f6f8fc;
+  color: #65718a;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.helper-box {
+  padding: 12px 14px;
+}
+
+.blocked-card {
+  padding: 20px;
+}
+
+.exclusion-fieldset {
+  border-color: #efdada;
+  background: #fffafa;
+}
+
+.completion-card {
+  display: grid;
+  grid-template-columns: 54px 1fr;
+  gap: 18px;
+  margin-top: 20px;
+  padding: 28px;
+  border: 1px solid #d9e8df;
+  border-radius: 20px;
+  background: #f5fbf7;
+}
+
+.completion-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 50%;
+  background: #276749;
+  color: #fff;
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.onboarding-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 20px;
+  border-top: 1px solid #e4e8ef;
+  font-size: 12px;
+}
+
+.invite-result {
+  margin: 10px 0 28px;
+  padding: 16px;
+  border: 1px solid #d7e3ff;
+  border-radius: 14px;
+  background: #f4f7ff;
+}
+
+.invite-result p {
+  margin: 5px 0;
+  color: #65718a;
+  font-size: 13px;
+}
+
+.invite-result a {
+  word-break: break-all;
+}
+
+.workspace-row,
+.member-row,
+.mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.workspace-row,
+.member-row {
+  justify-content: space-between;
+}
+
+.workspace-row div,
+.member-row > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.workspace-row small,
+.member-row small {
+  color: #8792a5;
+}
+
+.role-badge {
+  margin-left: auto;
+  border-radius: 999px;
+  background: #f0f3f8;
+  padding: 6px 9px;
+  color: #5d6980;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.member-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.member-actions form:first-child {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.member-actions select {
+  min-width: 120px;
+}
+
+.invite-form,
+.mapping-form {
+  display: grid;
+  grid-template-columns: 1fr 180px auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.invite-form label,
+.mapping-form label {
+  display: grid;
+  gap: 7px;
+  color: #59657b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pending-invites {
+  margin-top: 18px;
+}
+
+.pending-invites h3 {
+  font-size: 15px;
+}
+
+.pending-invites > div {
+  display: grid;
+  grid-template-columns: 1fr 120px 180px;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid #e6eaf1;
+  color: #5e6b81;
+  font-size: 12px;
+}
+
+.mapping-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.mapping-row span {
+  color: #8a95a8;
+}
+
+.mapping-row form {
+  margin-left: auto;
+}
+
+.readonly-details {
+  color: #5f6a80;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.readonly-details p {
+  margin: 8px 0 0;
+}
+
+.decision-context {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 14px;
+  color: #66728a;
+  font-size: 11px;
+}
+
+.reason-note {
+  display: block;
+  margin-top: 5px;
+  color: #8791a3;
+  line-height: 1.45;
+}
+
+.empty-state {
+  padding: 42px;
+  border: 1px dashed #ccd5e3;
+  border-radius: 20px;
+  background: #fff;
+  text-align: center;
+}
+
+.empty-state p {
+  max-width: 560px;
+  margin: 0 auto 18px;
+  color: #707b90;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .onboarding-progress-card {
+    grid-template-columns: 1fr;
+  }
+
+  .progress-count {
+    text-align: left;
+  }
+
+  .invite-form,
+  .mapping-form {
+    grid-template-columns: 1fr;
+  }
+
+  .workspace-row,
+  .member-row,
+  .mapping-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .role-badge,
+  .mapping-row form {
+    margin-left: 0;
+  }
+
+  .member-actions,
+  .member-actions form:first-child {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .pending-invites > div {
+    grid-template-columns: 1fr;
+  }
+}
