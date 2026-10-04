@@ -8,7 +8,7 @@ export type WebResearchContext = {
 };
 
 export function buildWebResearchPrompt(
-  context: WebResearchContext,
+  context: unknown,
   today = new Date().toISOString().slice(0, 10),
 ): string {
   return [
