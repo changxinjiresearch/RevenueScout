@@ -4,6 +4,7 @@ import { importDiscoveryCandidate } from "@/lib/companies/import-discovery";
 import { db } from "@/lib/db";
 import { jsonArrayValue } from "@/lib/db/json-value";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
+import { getGleifCandidateByLei } from "@/lib/discovery/gleif";
 import { publicUrl } from "@/lib/http/public-url";
 
 export async function POST(request: NextRequest) {
@@ -39,10 +40,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Discovery candidate not found." }, { status: 404 });
   }
 
+  const refreshedCandidate =
+    candidate.provider === "GLEIF"
+      ? (await getGleifCandidateByLei(candidate.providerRecordId)) ?? candidate
+      : candidate;
+
   const result = await importDiscoveryCandidate({
     organizationId: user.organizationId,
     userId: user.id,
-    candidate,
+    candidate: refreshedCandidate,
   });
 
   await sql.begin(async (tx) => {
