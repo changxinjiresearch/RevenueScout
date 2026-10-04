@@ -89,6 +89,8 @@ export default async function WorkspacePage({
         <Link className="brand-link" href="/">RevenueScout</Link>
         <div className="nav-links">
           <Link href="/">Today</Link>
+          <Link href="/discover">Discover</Link>
+          <Link href="/companies">Companies</Link>
           <Link href="/setup">Market Setup</Link>
           <Link className="nav-active" href="/workspace">Workspace</Link>
         </div>
