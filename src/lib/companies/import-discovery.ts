@@ -73,7 +73,7 @@ export async function importDiscoveryCandidate(input: {
         180,
         ${evidenceHash(candidate)},
         ${candidate.providerRecordId},
-        ${JSON.stringify(candidate)}::jsonb,
+        ${JSON.stringify(candidate)}::text::jsonb,
         ${userId}
       )
       ON CONFLICT (company_id, content_hash) WHERE content_hash IS NOT NULL
@@ -212,7 +212,7 @@ export async function importDiscoveryCandidate(input: {
         180,
         ${evidenceHash(candidate)},
         ${candidate.providerRecordId},
-        ${JSON.stringify(candidate)}::jsonb,
+        ${JSON.stringify(candidate)}::text::jsonb,
         ${userId}
       )
     `;
