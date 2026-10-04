@@ -623,6 +623,78 @@ function valueOfInformation(input: {
   );
 }
 
+function buildResearchTargets(input: {
+  dimensions: Dimension[];
+  validation: ClaimValidationSummary;
+  fitCompleteness: number;
+}): WebResearchResult["researchTargets"] {
+  const candidates: WebResearchResult["researchTargets"] = [];
+
+  const dimensionTargets: Record<string, { target: string; valueScore: number }> = {
+    intent: { target: "Current buying signals", valueScore: 92 },
+    timing: { target: "Recency of buying signals", valueScore: 78 },
+    need: { target: "Operational need / change evidence", valueScore: 84 },
+    budget: { target: "Employee size / budget proxy", valueScore: 66 },
+  };
+
+  for (const dimension of input.dimensions) {
+    if (dimension.value !== null) continue;
+    const target = dimensionTargets[dimension.key];
+    if (!target) continue;
+
+    candidates.push({
+      target: target.target,
+      reason: `${dimension.label} is currently unknown. A reliable source could materially narrow the potential range.`,
+      valueScore: target.valueScore,
+      status: "UNKNOWN",
+    });
+  }
+
+  if (input.fitCompleteness < 0.8) {
+    candidates.push({
+      target: "Missing ICP qualification facts",
+      reason:
+        "Some configured ICP criteria are still unknown. Confirming them could materially change commercial fit without treating the missing values as negative.",
+      valueScore: Math.round(70 + (1 - input.fitCompleteness) * 25),
+      status: "UNKNOWN",
+    });
+  }
+
+  for (const claim of input.validation.claims) {
+    if (claim.status === "CONFLICTED") {
+      candidates.push({
+        target: claim.claimType.replaceAll("_", " "),
+        reason:
+          "Independent sources disagree. Resolve the conflict before using this claim as a company fact or buying signal.",
+        valueScore: 96,
+        status: "CONFLICTED",
+      });
+    }
+
+    if (claim.status === "SINGLE_SOURCE") {
+      candidates.push({
+        target: claim.claimType.replaceAll("_", " "),
+        reason:
+          "Only one independent source family supports this claim. Find a second independent source to corroborate it.",
+        valueScore: Math.round(68 + claim.confidence * 18),
+        status: "SINGLE_SOURCE",
+      });
+    }
+  }
+
+  const best = new Map<string, WebResearchResult["researchTargets"][number]>();
+  for (const candidate of candidates) {
+    const current = best.get(candidate.target);
+    if (!current || candidate.valueScore > current.valueScore) {
+      best.set(candidate.target, candidate);
+    }
+  }
+
+  return [...best.values()]
+    .sort((a, b) => b.valueScore - a.valueScore)
+    .slice(0, 6);
+}
+
 function priorityAction(input: {
   potential: number;
   confidence: number;
@@ -811,6 +883,12 @@ export function runConversionModelV2(input: {
     ),
   );
 
+  const researchTargets = buildResearchTargets({
+    dimensions,
+    validation: input.validation,
+    fitCompleteness: bestIcp.completeness,
+  });
+
   const action = priorityAction({
     potential: potential.current,
     confidence: evidenceConfidence,
@@ -916,6 +994,7 @@ export function runConversionModelV2(input: {
     valueOfInformationScore: voi,
     priorityAction: action,
     unknownDimensions,
+    researchTargets,
     assessmentSummary,
     whyFit,
     whyNow,
