@@ -77,3 +77,15 @@ export type ClaimValidationSummary = {
   staleCount: number;
   independentFamilyCount: number;
 };
+
+
+export type ExistingEvidenceInput = {
+  sourceType: string;
+  sourceUrl: string;
+  sourceLabel: string;
+  title: string;
+  excerpt: string;
+  observedAt: string;
+  confidence: number;
+  verificationStatus: "CONFIRMED" | "LIKELY" | "UNVERIFIED" | "OUTDATED";
+};
