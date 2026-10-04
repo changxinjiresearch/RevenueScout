@@ -14,22 +14,71 @@ Status: **completed**
 - Expected Revenue calculation
 - Today-page prototype
 - unit tests for scoring invariants
+- CI
+- production deployment
 
-Exit gate: project builds, core scoring tests pass, and the Today page explains
-every recommendation.
+Exit gate: passed.
 
 ## M1 — Workspace, Offering and ICP
 
-- account creation and sign-in
+Status: **completed**
+
+### M1-A — Account and persistence
+
+- PostgreSQL persistence
+- registration, login and logout
+- secure password hashing and session cookies
 - organisation/workspace
-- roles
-- onboarding
 - Offering CRUD
 - ICP CRUD
-- inclusion and exclusion rules
+- idempotent schema migrations
 
-Exit gate: a real user can define what they sell and who they want to sell it
-to.
+### M1-B — Guided onboarding
+
+- first-run setup gate
+- company profile step
+- complete Offering step
+- ICP step
+- Offering ↔ ICP mapping step
+- progress/completeness state
+- validation and field guidance
+- incomplete configurations route back to onboarding instead of an empty dashboard
+
+### M1-C — Roles and workspace management
+
+- OWNER / ADMIN / MANAGER / REP
+- server-side permission checks
+- workspace member list
+- invitation links with expiry
+- invitation acceptance
+- member role updates
+- member removal
+- multiple workspace membership and active-workspace switching
+
+### M1-D — ICP and Offering intelligence
+
+- structured ICP criteria
+- executable hard exclusions
+- weighted ICP Fit
+- match explanation
+- Offering ↔ ICP mapping
+- deterministic Offering recommendation
+- deal-value basis from minimum / average / ideal Offering economics
+
+### M1-E — Configuration-to-decision integration
+
+- Today reads the active workspace configuration
+- hard-excluded companies are suppressed before ranking
+- ICP Fit is calculated rather than hard-coded
+- Recommended Offering is derived from explicit mappings
+- Estimated Deal Value is derived from Offering economics
+- Why this company cites matched ICP criteria
+- recommendation shows the matched ICP and deal-value basis
+- organisation configuration is versioned whenever GTM rules change
+
+Exit gate: a real user can define what they sell, define who they want to sell
+it to, control who may edit those rules, and see the saved configuration alter
+the decision surface in a traceable way.
 
 ## M2 — Company, evidence and buying signals
 

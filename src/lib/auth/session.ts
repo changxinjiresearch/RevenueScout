@@ -50,6 +50,8 @@ export interface CurrentUser {
   organizationId: string;
   organizationName: string;
   role: "OWNER" | "ADMIN" | "MANAGER" | "REP";
+  onboardingCompletedAt: Date | null;
+  configVersion: number;
 }
 
 export async function getCurrentUser(): Promise<CurrentUser | null> {
@@ -66,14 +68,17 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
       u.name,
       m.organization_id AS "organizationId",
       o.name AS "organizationName",
-      m.role
+      m.role,
+      o.onboarding_completed_at AS "onboardingCompletedAt",
+      o.config_version AS "configVersion"
     FROM sessions s
     JOIN users u ON u.id = s.user_id
-    JOIN memberships m ON m.user_id = u.id
+    JOIN memberships m
+      ON m.user_id = u.id
+     AND m.organization_id = u.active_organization_id
     JOIN organizations o ON o.id = m.organization_id
     WHERE s.token_hash = ${hashToken(token)}
       AND s.expires_at > NOW()
-    ORDER BY m.created_at ASC
     LIMIT 1
   `;
 

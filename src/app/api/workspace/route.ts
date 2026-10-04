@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
+import { canManageWorkspace } from "@/lib/permissions";
 
 function csv(value: FormDataEntryValue | null): string[] {
   return String(value ?? "")
@@ -9,13 +10,49 @@ function csv(value: FormDataEntryValue | null): string[] {
     .filter(Boolean);
 }
 
+function returnTo(formData: FormData): string {
+  const candidate = String(formData.get("returnTo") ?? "/setup");
+  return candidate.startsWith("/") && !candidate.startsWith("//")
+    ? candidate
+    : "/setup";
+}
+
 export async function POST(request: NextRequest) {
   const user = await requireUser();
   const formData = await request.formData();
+
+  if (!canManageWorkspace(user.role)) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const target = returnTo(formData);
   const name = String(formData.get("name") ?? "").trim();
+  const country = String(formData.get("country") ?? "").trim();
+  const industry = String(formData.get("industry") ?? "").trim();
+  const companySize = String(formData.get("companySize") ?? "").trim();
+  const serviceRegions = csv(formData.get("serviceRegions"));
+  const description = String(formData.get("description") ?? "").trim();
 
   if (!name) {
-    return NextResponse.redirect(new URL("/setup?error=Company+name+is+required", request.url), 303);
+    const url = new URL(target, request.url);
+    url.searchParams.set("error", "Company name is required.");
+    return NextResponse.redirect(url, 303);
+  }
+
+  if (
+    target === "/onboarding" &&
+    (!country ||
+      !industry ||
+      !companySize ||
+      serviceRegions.length === 0 ||
+      !description)
+  ) {
+    const url = new URL("/onboarding", request.url);
+    url.searchParams.set(
+      "error",
+      "Country, service region, industry, company size and description are required to finish this step.",
+    );
+    return NextResponse.redirect(url, 303);
   }
 
   const sql = db();
@@ -24,14 +61,17 @@ export async function POST(request: NextRequest) {
     SET
       name = ${name},
       website = ${String(formData.get("website") ?? "").trim() || null},
-      country = ${String(formData.get("country") ?? "").trim() || null},
-      service_regions = ${csv(formData.get("serviceRegions"))},
-      industry = ${String(formData.get("industry") ?? "").trim() || null},
-      company_size = ${String(formData.get("companySize") ?? "").trim() || null},
-      description = ${String(formData.get("description") ?? "").trim() || null},
+      country = ${country || null},
+      service_regions = ${serviceRegions},
+      industry = ${industry || null},
+      company_size = ${companySize || null},
+      description = ${description || null},
+      config_version = config_version + 1,
       updated_at = NOW()
     WHERE id = ${user.organizationId}
   `;
 
-  return NextResponse.redirect(new URL("/setup?saved=workspace", request.url), 303);
+  const url = new URL(target, request.url);
+  url.searchParams.set("saved", "workspace");
+  return NextResponse.redirect(url, 303);
 }
