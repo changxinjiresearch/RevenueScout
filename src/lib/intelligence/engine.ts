@@ -57,6 +57,7 @@ export async function runRevenueScoutIntelligenceV2(input: {
   const observations = detectBuyingSignals(
     collector.pages,
     now,
+    collector.officialWebsite || undefined,
   );
 
   const claimCandidates = buildClaimCandidates({
