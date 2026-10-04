@@ -364,19 +364,19 @@ export default async function Home() {
           <strong>{money(expectedRevenue)}</strong>
         </article>
         <article className="summary-card">
-          <span>Strongest signal</span>
-          <strong>{items[0]?.assessment.primarySignal?.type ?? "—"}</strong>
+          <span>Research candidates</span>
+          <strong>{researchQueue.length}</strong>
         </article>
       </section>
 
       <section className="section-heading">
         <div>
-          <div className="eyebrow">Priority queue</div>
-          <h2>Today&apos;s Best Opportunities</h2>
+          <div className="eyebrow">Sales priority</div>
+          <h2>Who is most worth contacting now?</h2>
         </div>
         <p>
           {user
-            ? `Ranked from ${storedCompanyCount} persisted company records. Core ICP qualification, hard exclusions, evidence confidence and buying-signal timing are applied before ranking.`
+            ? `Ranked from ${storedCompanyCount} persisted company records. Completed Intelligence Engine v2 analyses use Sales Priority, while unanalysed records fall back to the legacy opportunity score.`
             : "This is synthetic demo data. Sign in to use persisted companies and traceable evidence."}
         </p>
       </section>
@@ -479,11 +479,29 @@ export default async function Home() {
               </div>
 
               <aside className="score-column">
-                <div className="score-block">
-                  <span>Opportunity Score</span>
-                  <strong>{opportunity.assessment.opportunityScore}</strong>
-                  <small>/100</small>
-                </div>
+                {opportunity.salesPriorityScore !== null ? (
+                  <>
+                    <div className="score-block">
+                      <span>Sales Priority</span>
+                      <strong>{opportunity.salesPriorityScore}</strong>
+                      <small>/100</small>
+                    </div>
+                    <div className="research-priority-mini">
+                      <span>
+                        Potential <strong>{opportunity.potentialScore}</strong>
+                      </span>
+                      <span>
+                        Confidence <strong>{opportunity.confidenceScore}</strong>
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="score-block">
+                    <span>Opportunity Score</span>
+                    <strong>{opportunity.assessment.opportunityScore}</strong>
+                    <small>/100</small>
+                  </div>
+                )}
 
                 <div className="revenue-block">
                   <span>Expected Revenue</span>
@@ -512,6 +530,86 @@ export default async function Home() {
           ))}
         </section>
       )}
+
+      {user ? (
+        <>
+          <section className="section-heading research-queue-heading">
+            <div>
+              <div className="eyebrow">Research priority</div>
+              <h2>Which uncertain companies are most worth investigating?</h2>
+            </div>
+            <p>
+              Missing data is not treated as negative. This queue ranks
+              companies by plausible upside and Value of Information, so a
+              potentially excellent customer is not buried just because public
+              evidence is incomplete.
+            </p>
+          </section>
+
+          {researchQueue.length === 0 ? (
+            <section className="empty-state compact-empty-state">
+              <h3>No high-value research target right now.</h3>
+              <p>
+                Companies appear here when uncertainty is material and further
+                evidence could meaningfully change the sales decision.
+              </p>
+            </section>
+          ) : (
+            <section className="research-priority-list">
+              {researchQueue.map((item, index) => (
+                <article className="research-priority-card" key={item.companyId}>
+                  <div className="rank">{index + 1}</div>
+                  <div className="research-priority-main">
+                    <div className="company-title-row">
+                      <div>
+                        <h3>
+                          <Link href={`/companies/${item.companyId}`}>
+                            {item.companyName}
+                          </Link>
+                        </h3>
+                        <p>{item.location || "Location unknown"}</p>
+                      </div>
+                      <span className="confidence">
+                        {item.priorityAction.replaceAll("_", " ")}
+                      </span>
+                    </div>
+
+                    <div className="research-metric-grid">
+                      <div>
+                        <span>Potential</span>
+                        <strong>{item.potentialScore}</strong>
+                      </div>
+                      <div>
+                        <span>Confidence</span>
+                        <strong>{item.confidenceScore}</strong>
+                      </div>
+                      <div>
+                        <span>Potential range</span>
+                        <strong>
+                          {item.conservativeScore}–{item.upsideScore}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Research Priority</span>
+                        <strong>{item.researchPriorityScore}</strong>
+                      </div>
+                      <div>
+                        <span>Value of Information</span>
+                        <strong>{item.valueOfInformationScore}</strong>
+                      </div>
+                    </div>
+
+                    <div className="next-action">
+                      <span className="field-label">Next best action</span>
+                      <strong>Open the company and resolve the highest-value unknown claim.</strong>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </section>
+          )}
+        </>
+      ) : null}
 
       <footer className="disclaimer">
         {user
