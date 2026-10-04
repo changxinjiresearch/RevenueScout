@@ -86,6 +86,24 @@ function triageClass(status: string) {
   return "triage-review";
 }
 
+function priorityActionText(action: WebResearchResult["priorityAction"]) {
+  if (action === "CONTACT_NOW") return "Contact now";
+  if (action === "INVESTIGATE_URGENTLY") return "Investigate urgently";
+  if (action === "REVIEW") return "Human review";
+  if (action === "GATHER_MORE_DATA") return "Gather more data";
+  if (action === "REJECT") return "Reject";
+  return "Deprioritise research";
+}
+
+function claimStatusText(status: string) {
+  if (status === "CONFIRMED") return "Confirmed";
+  if (status === "CORROBORATED") return "Corroborated";
+  if (status === "SINGLE_SOURCE") return "Single source";
+  if (status === "CONFLICTED") return "Conflicted";
+  if (status === "STALE") return "Stale";
+  return "Unknown";
+}
+
 export default async function CompanyIntelligencePage({
   params,
   searchParams,
@@ -278,7 +296,7 @@ export default async function CompanyIntelligencePage({
     FROM web_enrichment_runs
     WHERE company_id = ${id}
       AND organization_id = ${user.organizationId}
-      AND engine = 'REVENUESCOUT_INTELLIGENCE_V1'
+      AND engine = 'REVENUESCOUT_INTELLIGENCE_V2'
     ORDER BY created_at DESC
     LIMIT 1
   `;
@@ -301,7 +319,39 @@ export default async function CompanyIntelligencePage({
 
   const primaryEvidence = evidence[0] ?? null;
   const lei = identifiers.find((item) => item.identifierType === "LEI");
-  const hasMissing = triage.missingFields.length > 0;
+  const engineResult =
+    researchRun?.status === "COMPLETED"
+      ? researchRun.structuredResult
+      : null;
+
+  const displayTriageStatus = engineResult
+    ? engineResult.priorityAction === "CONTACT_NOW"
+      ? "HIGH_POTENTIAL"
+      : engineResult.priorityAction === "REJECT"
+        ? "LOW_POTENTIAL"
+        : engineResult.priorityAction === "REVIEW"
+          ? "MEDIUM_POTENTIAL"
+          : "NEEDS_ENRICHMENT"
+    : triage.status;
+
+  const displayTriageScore =
+    engineResult?.overallPotentialScore ?? triage.score;
+  const displayTriageHeadline =
+    engineResult?.assessmentSummary ?? triage.headline;
+  const displayTriageReasons = engineResult
+    ? [...engineResult.whyFit, ...engineResult.whyNow].slice(0, 4)
+    : triage.reasons;
+  const displayMissingFields =
+    engineResult?.unknownDimensions ?? triage.missingFields;
+  const hasMissing = displayMissingFields.length > 0;
+
+  const displayRecommendation = engineResult
+    ? engineResult.priorityAction === "CONTACT_NOW"
+      ? "ADD_TO_PIPELINE"
+      : engineResult.priorityAction === "REJECT"
+        ? "REJECT"
+        : "REVIEW"
+    : triage.recommendation;
 
   return (
     <main className="setup-shell">
@@ -372,7 +422,7 @@ export default async function CompanyIntelligencePage({
             <div className="eyebrow">RevenueScout Intelligence Engine</div>
             <h2>Zero-cost company analysis</h2>
             <p>
-              RevenueScout collects public company pages, extracts company facts and buying signals, then scores them with the built-in RS Conversion Model v1. No paid AI API is used.
+              RevenueScout collects public company pages, extracts company facts and buying signals, then scores them with the built-in RS Conversion Model v2. No paid AI API is used.
             </p>
           </div>
           <form action={`/api/companies/${id}/research`} method="post">
@@ -407,15 +457,9 @@ export default async function CompanyIntelligencePage({
           <>
             <div className="ai-score-row">
               <div>
-                <span>Commercial potential</span>
+                <span>Potential</span>
                 <strong>
                   {researchRun.structuredResult.overallPotentialScore}/100
-                </strong>
-              </div>
-              <div>
-                <span>Estimated conversion likelihood</span>
-                <strong>
-                  {researchRun.structuredResult.estimatedConversionPercent}%
                 </strong>
               </div>
               <div>
@@ -425,8 +469,46 @@ export default async function CompanyIntelligencePage({
                 </strong>
               </div>
               <div>
-                <span>Sources checked</span>
-                <strong>{researchRun.sourceCount}</strong>
+                <span>Potential range</span>
+                <strong>
+                  {researchRun.structuredResult.potentialConservativeScore}–
+                  {researchRun.structuredResult.potentialUpsideScore}
+                </strong>
+              </div>
+              <div>
+                <span>Recommended mode</span>
+                <strong>
+                  {priorityActionText(
+                    researchRun.structuredResult.priorityAction,
+                  )}
+                </strong>
+              </div>
+            </div>
+
+            <div className="ai-score-row secondary-score-row">
+              <div>
+                <span>Sales priority</span>
+                <strong>
+                  {researchRun.structuredResult.salesPriorityScore}/100
+                </strong>
+              </div>
+              <div>
+                <span>Research priority</span>
+                <strong>
+                  {researchRun.structuredResult.researchPriorityScore}/100
+                </strong>
+              </div>
+              <div>
+                <span>Value of information</span>
+                <strong>
+                  {researchRun.structuredResult.valueOfInformationScore}/100
+                </strong>
+              </div>
+              <div>
+                <span>Conversion estimate</span>
+                <strong>
+                  {researchRun.structuredResult.estimatedConversionPercent}%
+                </strong>
               </div>
             </div>
 
@@ -435,8 +517,33 @@ export default async function CompanyIntelligencePage({
                 {researchRun.structuredResult.assessmentSummary}
               </strong>
               <p>
-                Pre-contact estimate from RS Conversion Model v1. It is deterministic and not yet calibrated against historical Won/Lost outcomes.
+                Unknown is not treated as negative. Potential is calculated
+                from known dimensions; confidence and the conservative/upside
+                range describe how uncertain that estimate still is.
               </p>
+            </div>
+
+            <div className="claim-validation-summary">
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.confirmedCount}</strong>
+                Confirmed
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.corroboratedCount}</strong>
+                Corroborated
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.singleSourceCount}</strong>
+                Single-source
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.conflictedCount}</strong>
+                Conflicted
+              </span>
+              <span>
+                <strong>{researchRun.structuredResult.claimValidation.independentFamilyCount}</strong>
+                Independent families
+              </span>
             </div>
 
             <div className="ai-insight-grid">
@@ -503,6 +610,64 @@ export default async function CompanyIntelligencePage({
               <strong>{researchRun.structuredResult.nextAction}</strong>
             </div>
 
+            {researchRun.structuredResult.researchTargets.length > 0 ? (
+              <section className="research-targets-panel">
+                <div className="field-label">Highest-value evidence to collect next</div>
+                <div className="research-target-list">
+                  {researchRun.structuredResult.researchTargets
+                    .slice(0, 5)
+                    .map((target) => (
+                      <div className="research-target-item" key={target.target}>
+                        <div>
+                          <strong>{target.target}</strong>
+                          <span>{target.status.replaceAll("_", " ")}</span>
+                        </div>
+                        <p>{target.reason}</p>
+                        <b>VOI {target.valueScore}/100</b>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            ) : null}
+
+            <details className="claim-validation-details" open>
+              <summary>
+                Cross-validated claims (
+                {researchRun.structuredResult.validatedClaims.length})
+              </summary>
+              <div className="claim-list">
+                {researchRun.structuredResult.validatedClaims
+                  .slice(0, 12)
+                  .map((claim) => (
+                    <article
+                      className="claim-item"
+                      key={`${claim.claimType}:${claim.claimKey}`}
+                    >
+                      <div className="claim-item-top">
+                        <strong>{claim.claimType.replaceAll("_", " ")}</strong>
+                        <span className={`claim-status claim-${claim.status.toLowerCase().replaceAll("_", "-")}`}>
+                          {claimStatusText(claim.status)}
+                        </span>
+                      </div>
+                      <p>{claim.explanation}</p>
+                      <div className="claim-meta">
+                        <span>Confidence {Math.round(claim.confidence * 100)}%</span>
+                        <span>
+                          {claim.supportingFamilyCount} supporting independent
+                          family/families
+                        </span>
+                        {claim.conflictingFamilyCount > 0 ? (
+                          <span>
+                            {claim.conflictingFamilyCount} conflicting
+                            family/families
+                          </span>
+                        ) : null}
+                      </div>
+                    </article>
+                  ))}
+              </div>
+            </details>
+
             {researchRun.sourceUrls.length > 0 ? (
               <details className="ai-sources">
                 <summary>
@@ -529,25 +694,29 @@ export default async function CompanyIntelligencePage({
       <section className="triage-hero">
         <div className="triage-main">
           <div className="triage-label-row">
-            <span className={`triage-pill ${triageClass(triage.status)}`}>
-              {triageText(triage.status)}
+            <span className={`triage-pill ${triageClass(displayTriageStatus)}`}>
+              {triageText(displayTriageStatus)}
             </span>
-            {triage.score !== null ? (
-              <span className="triage-score">{triage.score}/100</span>
+            {displayTriageScore !== null ? (
+              <span className="triage-score">{displayTriageScore}/100</span>
             ) : null}
           </div>
-          <h2>{triage.headline}</h2>
+          <h2>{displayTriageHeadline}</h2>
           <ul className="triage-reasons">
-            {triage.reasons.map((reason) => (
+            {displayTriageReasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
           </ul>
 
           {hasMissing ? (
             <div className="missing-strip">
-              <strong>Only these fields still block a confident ICP decision:</strong>
+              <strong>
+                {engineResult
+                  ? "Unknown dimensions worth researching:"
+                  : "Only these fields still block a confident ICP decision:"}
+              </strong>
               <div>
-                {triage.missingFields.map((field) => (
+                {displayMissingFields.map((field) => (
                   <span key={field}>{field}</span>
                 ))}
               </div>
@@ -558,9 +727,9 @@ export default async function CompanyIntelligencePage({
         <aside className="triage-action-panel">
           <span className="field-label">Recommended action</span>
           <strong>
-            {triage.recommendation === "ADD_TO_PIPELINE"
+            {displayRecommendation === "ADD_TO_PIPELINE"
               ? "Add to pipeline"
-              : triage.recommendation === "REJECT"
+              : displayRecommendation === "REJECT"
                 ? "Reject"
                 : "Review"}
           </strong>

@@ -399,16 +399,12 @@ export async function collectPublicPages(input: {
   for (const value of input.evidenceUrls ?? []) {
     const url = validPublicUrl(value);
     if (!url) continue;
-
-    if (
-      resolved?.url &&
-      url.hostname !== new URL(resolved.url).hostname
-    ) {
-      continue;
-    }
-
     seeds.push(url.toString());
   }
+
+  const officialHostname = resolved?.url
+    ? new URL(resolved.url).hostname
+    : null;
 
   if (!resolved?.url) {
     warnings.push(
@@ -441,8 +437,13 @@ export async function collectPublicPages(input: {
         pageKind: pageKind(page.finalUrl),
       });
 
-      for (const link of prioritizeLinks(page.links).slice(0, 16)) {
-        if (!seen.has(link) && queue.length < 30) queue.push(link);
+      if (
+        officialHostname &&
+        page.finalUrl.hostname === officialHostname
+      ) {
+        for (const link of prioritizeLinks(page.links).slice(0, 16)) {
+          if (!seen.has(link) && queue.length < 30) queue.push(link);
+        }
       }
     } catch (error) {
       warnings.push(

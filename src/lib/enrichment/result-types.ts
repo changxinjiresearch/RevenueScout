@@ -1,4 +1,5 @@
 import type { ConfidenceLabel, SignalType } from "../domain/types";
+import type { ValidatedClaim } from "../intelligence/claims";
 
 export type ResearchSignalType = SignalType | "NONE";
 
@@ -35,7 +36,26 @@ export type WebResearchResult = {
   needScore: number;
   evidenceConfidence: number;
   overallPotentialScore: number;
+  potentialConservativeScore: number;
+  potentialUpsideScore: number;
   estimatedConversionPercent: number;
+  salesPriorityScore: number;
+  researchPriorityScore: number;
+  valueOfInformationScore: number;
+  priorityAction:
+    | "CONTACT_NOW"
+    | "INVESTIGATE_URGENTLY"
+    | "REVIEW"
+    | "GATHER_MORE_DATA"
+    | "REJECT"
+    | "DEPRIORITISE_RESEARCH";
+  unknownDimensions: string[];
+  researchTargets: Array<{
+    target: string;
+    reason: string;
+    valueScore: number;
+    status: "UNKNOWN" | "SINGLE_SOURCE" | "CONFLICTED";
+  }>;
   assessmentSummary: string;
   whyFit: string[];
   whyNow: string[];
@@ -43,4 +63,13 @@ export type WebResearchResult = {
   recommendedContactRole: string;
   nextAction: string;
   observations: WebResearchObservation[];
+  validatedClaims: ValidatedClaim[];
+  claimValidation: {
+    confirmedCount: number;
+    corroboratedCount: number;
+    singleSourceCount: number;
+    conflictedCount: number;
+    staleCount: number;
+    independentFamilyCount: number;
+  };
 };

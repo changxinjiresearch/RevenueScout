@@ -20,12 +20,42 @@ import { getOnboardingState } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 
+type PriorityRun = {
+  companyId: string;
+  potentialScore: number | null;
+  confidenceScore: number | null;
+  conservativeScore: number | null;
+  upsideScore: number | null;
+  salesPriorityScore: number | null;
+  researchPriorityScore: number | null;
+  valueOfInformationScore: number | null;
+  priorityAction: string | null;
+};
+
 type TodayItem = OpportunityInput & {
   assessment: ReturnType<typeof assessOpportunity>;
   matchedIcpName: string | null;
   offeringReason: string | null;
   dealValueBasis: string | null;
   companyHref: string | null;
+  salesPriorityScore: number | null;
+  researchPriorityScore: number | null;
+  potentialScore: number | null;
+  confidenceScore: number | null;
+  priorityAction: string | null;
+};
+
+type ResearchQueueItem = {
+  companyId: string;
+  companyName: string;
+  location: string;
+  potentialScore: number;
+  confidenceScore: number;
+  conservativeScore: number;
+  upsideScore: number;
+  researchPriorityScore: number;
+  valueOfInformationScore: number;
+  priorityAction: string;
 };
 
 function money(value: number): string {
@@ -41,6 +71,7 @@ export default async function Home() {
   let items: TodayItem[] = [];
   let configVersion: number | null = null;
   let storedCompanyCount = 0;
+  let researchQueue: ResearchQueueItem[] = [];
 
   if (user) {
     const onboarding = await getOnboardingState(user.organizationId);
@@ -49,7 +80,7 @@ export default async function Home() {
     }
 
     const sql = db();
-    const [icps, offerings, links, companies, evidence, signals] =
+    const [icps, offerings, links, companies, evidence, signals, priorityRuns] =
       await Promise.all([
         sql<IcpRule[]>`
           SELECT
@@ -165,10 +196,31 @@ export default async function Home() {
           JOIN company_evidence e ON e.id = s.evidence_id
           WHERE s.organization_id = ${user.organizationId}
         `,
+        sql<PriorityRun[]>`
+          SELECT DISTINCT ON (company_id)
+            company_id AS "companyId",
+            potential_score AS "potentialScore",
+            confidence_score AS "confidenceScore",
+            conservative_score AS "conservativeScore",
+            upside_score AS "upsideScore",
+            sales_priority_score AS "salesPriorityScore",
+            research_priority_score AS "researchPriorityScore",
+            value_of_information_score AS "valueOfInformationScore",
+            priority_action AS "priorityAction"
+          FROM web_enrichment_runs
+          WHERE organization_id = ${user.organizationId}
+            AND status = 'COMPLETED'
+            AND engine = 'REVENUESCOUT_INTELLIGENCE_V2'
+          ORDER BY company_id, created_at DESC
+        `,
       ]);
 
     storedCompanyCount = companies.length;
     const configuredItems: TodayItem[] = [];
+    const salesCompanyIds = new Set<string>();
+    const runByCompany = new Map(
+      priorityRuns.map((run) => [run.companyId, run]),
+    );
 
     for (const company of companies) {
       const companyEvidence = evidence.filter(
@@ -177,6 +229,7 @@ export default async function Home() {
       const companySignals = signals.filter(
         (signal) => signal.companyId === company.id,
       );
+      const priorityRun = runByCompany.get(company.id) ?? null;
 
       const configured = buildConfiguredOpportunityFromCompany({
         company,
@@ -187,18 +240,64 @@ export default async function Home() {
         links,
       });
 
-      if (!configured) continue;
-
-      const opportunity = configured.opportunity;
-      configuredItems.push({
-        ...opportunity,
-        assessment: assessOpportunity(opportunity),
-        matchedIcpName: configured.matchedIcp.icpName,
-        offeringReason: configured.offeringReason,
-        dealValueBasis: configured.dealValueBasis,
-        companyHref: `/companies/${company.id}`,
-      });
+      if (configured) {
+        salesCompanyIds.add(company.id);
+        const opportunity = configured.opportunity;
+        configuredItems.push({
+          ...opportunity,
+          assessment: assessOpportunity(opportunity),
+          matchedIcpName: configured.matchedIcp.icpName,
+          offeringReason: configured.offeringReason,
+          dealValueBasis: configured.dealValueBasis,
+          companyHref: `/companies/${company.id}`,
+          salesPriorityScore: priorityRun?.salesPriorityScore ?? null,
+          researchPriorityScore: priorityRun?.researchPriorityScore ?? null,
+          potentialScore: priorityRun?.potentialScore ?? null,
+          confidenceScore: priorityRun?.confidenceScore ?? null,
+          priorityAction: priorityRun?.priorityAction ?? null,
+        });
+      }
     }
+
+    const companyById = new Map(companies.map((company) => [company.id, company]));
+
+    researchQueue = priorityRuns
+      .filter(
+        (run) =>
+          run.researchPriorityScore !== null &&
+          run.potentialScore !== null &&
+          run.confidenceScore !== null &&
+          run.conservativeScore !== null &&
+          run.upsideScore !== null &&
+          run.valueOfInformationScore !== null &&
+          run.priorityAction !== "REJECT" &&
+          (run.priorityAction === "INVESTIGATE_URGENTLY" ||
+            run.priorityAction === "GATHER_MORE_DATA" ||
+            (run.researchPriorityScore ?? 0) > (run.salesPriorityScore ?? 0) ||
+            !salesCompanyIds.has(run.companyId)),
+      )
+      .map((run) => {
+        const company = companyById.get(run.companyId);
+        return {
+          companyId: run.companyId,
+          companyName: company?.displayName ?? "Unknown company",
+          location: [company?.city, company?.state, company?.country]
+            .filter(Boolean)
+            .join(", "),
+          potentialScore: run.potentialScore ?? 0,
+          confidenceScore: run.confidenceScore ?? 0,
+          conservativeScore: run.conservativeScore ?? 0,
+          upsideScore: run.upsideScore ?? 0,
+          researchPriorityScore: run.researchPriorityScore ?? 0,
+          valueOfInformationScore: run.valueOfInformationScore ?? 0,
+          priorityAction: run.priorityAction ?? "GATHER_MORE_DATA",
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.researchPriorityScore - a.researchPriorityScore ||
+          b.valueOfInformationScore - a.valueOfInformationScore,
+      );
 
     items = configuredItems;
     configVersion = user.configVersion;
@@ -210,11 +309,17 @@ export default async function Home() {
       offeringReason: null,
       dealValueBasis: null,
       companyHref: null,
+      salesPriorityScore: null,
+      researchPriorityScore: null,
+      potentialScore: null,
+      confidenceScore: null,
+      priorityAction: null,
     }));
   }
 
   items.sort(
     (a, b) =>
+      (b.salesPriorityScore ?? -1) - (a.salesPriorityScore ?? -1) ||
       b.assessment.expectedRevenue - a.assessment.expectedRevenue ||
       b.assessment.opportunityScore - a.assessment.opportunityScore,
   );
@@ -263,19 +368,19 @@ export default async function Home() {
           <strong>{money(expectedRevenue)}</strong>
         </article>
         <article className="summary-card">
-          <span>Strongest signal</span>
-          <strong>{items[0]?.assessment.primarySignal?.type ?? "—"}</strong>
+          <span>Research candidates</span>
+          <strong>{researchQueue.length}</strong>
         </article>
       </section>
 
       <section className="section-heading">
         <div>
-          <div className="eyebrow">Priority queue</div>
-          <h2>Today&apos;s Best Opportunities</h2>
+          <div className="eyebrow">Sales priority</div>
+          <h2>Who is most worth contacting now?</h2>
         </div>
         <p>
           {user
-            ? `Ranked from ${storedCompanyCount} persisted company records. Core ICP qualification, hard exclusions, evidence confidence and buying-signal timing are applied before ranking.`
+            ? `Ranked from ${storedCompanyCount} persisted company records. Completed Intelligence Engine v2 analyses use Sales Priority, while unanalysed records fall back to the legacy opportunity score.`
             : "This is synthetic demo data. Sign in to use persisted companies and traceable evidence."}
         </p>
       </section>
@@ -378,11 +483,29 @@ export default async function Home() {
               </div>
 
               <aside className="score-column">
-                <div className="score-block">
-                  <span>Opportunity Score</span>
-                  <strong>{opportunity.assessment.opportunityScore}</strong>
-                  <small>/100</small>
-                </div>
+                {opportunity.salesPriorityScore !== null ? (
+                  <>
+                    <div className="score-block">
+                      <span>Sales Priority</span>
+                      <strong>{opportunity.salesPriorityScore}</strong>
+                      <small>/100</small>
+                    </div>
+                    <div className="research-priority-mini">
+                      <span>
+                        Potential <strong>{opportunity.potentialScore}</strong>
+                      </span>
+                      <span>
+                        Confidence <strong>{opportunity.confidenceScore}</strong>
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="score-block">
+                    <span>Opportunity Score</span>
+                    <strong>{opportunity.assessment.opportunityScore}</strong>
+                    <small>/100</small>
+                  </div>
+                )}
 
                 <div className="revenue-block">
                   <span>Expected Revenue</span>
@@ -412,9 +535,89 @@ export default async function Home() {
         </section>
       )}
 
+      {user ? (
+        <>
+          <section className="section-heading research-queue-heading">
+            <div>
+              <div className="eyebrow">Research priority</div>
+              <h2>Which uncertain companies are most worth investigating?</h2>
+            </div>
+            <p>
+              Missing data is not treated as negative. This queue ranks
+              companies by plausible upside and Value of Information, so a
+              potentially excellent customer is not buried just because public
+              evidence is incomplete.
+            </p>
+          </section>
+
+          {researchQueue.length === 0 ? (
+            <section className="empty-state compact-empty-state">
+              <h3>No high-value research target right now.</h3>
+              <p>
+                Companies appear here when uncertainty is material and further
+                evidence could meaningfully change the sales decision.
+              </p>
+            </section>
+          ) : (
+            <section className="research-priority-list">
+              {researchQueue.map((item, index) => (
+                <article className="research-priority-card" key={item.companyId}>
+                  <div className="rank">{index + 1}</div>
+                  <div className="research-priority-main">
+                    <div className="company-title-row">
+                      <div>
+                        <h3>
+                          <Link href={`/companies/${item.companyId}`}>
+                            {item.companyName}
+                          </Link>
+                        </h3>
+                        <p>{item.location || "Location unknown"}</p>
+                      </div>
+                      <span className="confidence">
+                        {item.priorityAction.replaceAll("_", " ")}
+                      </span>
+                    </div>
+
+                    <div className="research-metric-grid">
+                      <div>
+                        <span>Potential</span>
+                        <strong>{item.potentialScore}</strong>
+                      </div>
+                      <div>
+                        <span>Confidence</span>
+                        <strong>{item.confidenceScore}</strong>
+                      </div>
+                      <div>
+                        <span>Potential range</span>
+                        <strong>
+                          {item.conservativeScore}–{item.upsideScore}
+                        </strong>
+                      </div>
+                      <div>
+                        <span>Research Priority</span>
+                        <strong>{item.researchPriorityScore}</strong>
+                      </div>
+                      <div>
+                        <span>Value of Information</span>
+                        <strong>{item.valueOfInformationScore}</strong>
+                      </div>
+                    </div>
+
+                    <div className="next-action">
+                      <span className="field-label">Next best action</span>
+                      <strong>Open the company and resolve the highest-value unknown claim.</strong>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </section>
+          )}
+        </>
+      ) : null}
+
       <footer className="disclaimer">
         {user
-          ? "Signed-in Today now uses persisted M2 company, evidence and signal records. Conversion probability remains an early heuristic until M3 persists and calibrates opportunity estimates."
+          ? "Today separates Sales Priority from Research Priority. Intelligence Engine v2 treats missing data as unknown, validates commercial claims across independent source families, and keeps conversion estimates explicitly pre-calibration until real Won/Lost outcomes are available."
           : "Demo mode uses synthetic fixtures only. No demo company should be interpreted as a real discovered business."}
       </footer>
     </main>

@@ -550,7 +550,20 @@ export function runConversionModelV1(input: {
     needScore: need,
     evidenceConfidence,
     overallPotentialScore,
+    potentialConservativeScore: overallPotentialScore,
+    potentialUpsideScore: overallPotentialScore,
     estimatedConversionPercent,
+    salesPriorityScore: overallPotentialScore,
+    researchPriorityScore: 0,
+    valueOfInformationScore: 0,
+    priorityAction:
+      overallPotentialScore >= 75 && evidenceConfidence >= 70
+        ? "CONTACT_NOW"
+        : overallPotentialScore < 40 && evidenceConfidence >= 70
+          ? "REJECT"
+          : "REVIEW",
+    unknownDimensions: [],
+    researchTargets: [],
     assessmentSummary,
     whyFit,
     whyNow,
@@ -561,5 +574,14 @@ export function runConversionModelV1(input: {
     ),
     nextAction,
     observations: input.signals,
+    validatedClaims: [],
+    claimValidation: {
+      confirmedCount: 0,
+      corroboratedCount: 0,
+      singleSourceCount: 0,
+      conflictedCount: 0,
+      staleCount: 0,
+      independentFamilyCount: 0,
+    },
   };
 }

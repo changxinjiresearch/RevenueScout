@@ -1,4 +1,5 @@
 import type { WebResearchObservation, WebResearchResult } from "../enrichment/result-types";
+import type { ClaimValidationSummary } from "./claims";
 
 export type CollectedPage = {
   url: string;
@@ -42,8 +43,9 @@ export type ExtractedCompanyFeatures = {
 export type LocalIntelligenceRun = {
   result: WebResearchResult;
   sourceUrls: string[];
-  engine: "REVENUESCOUT_INTELLIGENCE_V1";
-  model: "RS_CONVERSION_V1";
+  engine: "REVENUESCOUT_INTELLIGENCE_V2";
+  model: "RS_CONVERSION_V2";
   collector: CollectorResult;
   observations: WebResearchObservation[];
+  validation: ClaimValidationSummary;
 };

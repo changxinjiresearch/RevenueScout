@@ -108,14 +108,24 @@ Status: **completed**
 - zero-cost public-web collector fetches verified company pages and existing public evidence URLs
 - deterministic feature extraction identifies industry, workforce clues, service regions, business models, technologies and decision roles
 - built-in Buying Signal Detector identifies Hiring, Expansion, Funding, Leadership, Technology, Procurement, Growth and Potential Operational Pain
-- RS Conversion Model v1 combines ICP fit, buying intent, timing, need, budget fit and evidence confidence into a reproducible commercial-potential score and conservative pre-contact conversion estimate
-- source-grounded observations are persisted as Evidence / Buying Signals
-- high-confidence company facts can be auto-filled while uncertain facts remain estimates
-- fast-review UI shows commercial potential, conversion likelihood, why-fit, why-now, risks, recommended contact and next action
+- RevenueScout Intelligence Engine v2 inserts a Claim + Cross-validation layer between Evidence and live Company Facts / Buying Signals
+- source independence is estimated by registrable-domain family plus near-duplicate content clustering, so syndicated copies do not inflate confidence
+- Claim confidence separates Source Quality, Independence, Agreement, Freshness and Extraction Confidence
+- non-authoritative single-source commercial claims cannot silently become high-confidence facts
+- mutually exclusive claims can be marked Conflicted instead of averaged away
+- RS Conversion Model v2 treats missing decision dimensions as Unknown rather than zero/negative evidence
+- Current Potential is separated from Evidence Confidence and a Conservative-to-Upside Potential Range
+- Sales Priority answers who is worth contacting now
+- Research Priority answers which uncertain company is worth investigating next
+- Value of Information ranks the evidence gap most likely to change the decision
+- source-grounded observations are persisted as Evidence; only Confirmed/Corroborated commercial claims become live high-weight Buying Signals
+- high-confidence company facts can be auto-filled while single-source/conflicted facts stay visible without silently becoming canonical
+- fast-review UI shows Potential, Confidence, Potential Range, Sales Priority, Research Priority, VOI, cross-validated claims, why-fit, why-now, risks, recommended contact and next evidence target
 
 Exit gate: **passed**. Companies can enter RevenueScout from a real external source or
-manual creation, duplicates are controlled, every buying signal points to stored
-evidence, and signed-in ranking is driven by persisted company intelligence.
+manual creation, duplicates are controlled, evidence is grouped into auditable
+claims with cross-source validation, and signed-in Today separates sales work
+from research work instead of treating sparse public data as negative evidence.
 
 ## M3 — Opportunity intelligence
 
