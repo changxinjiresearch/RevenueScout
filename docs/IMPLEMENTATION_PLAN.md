@@ -82,7 +82,7 @@ the decision surface in a traceable way.
 
 ## M2 — Company, evidence and buying signals
 
-Status: **implementation complete; pending final production verification**
+Status: **completed**
 
 - persistent Company record and company database
 - manual lead creation
@@ -105,7 +105,7 @@ Status: **implementation complete; pending final production verification**
   invent industry, headcount or buying signals
 - synthetic fixtures remain only for signed-out demo mode
 
-Exit gate: companies can enter RevenueScout from a real external source or
+Exit gate: **passed**. Companies can enter RevenueScout from a real external source or
 manual creation, duplicates are controlled, every buying signal points to stored
 evidence, and signed-in ranking is driven by persisted company intelligence.
 
