@@ -427,7 +427,9 @@ export function runConversionModelV1(input: {
 }): WebResearchResult {
   const now = input.now ?? new Date();
   const currentSignals = input.signals.filter(
-    (signal) => signal.verificationStatus !== "OUTDATED",
+    (signal) =>
+      signal.verificationStatus === "CONFIRMED" ||
+      signal.verificationStatus === "LIKELY",
   );
 
   const scoredIcps =
