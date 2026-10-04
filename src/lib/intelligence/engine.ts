@@ -90,9 +90,17 @@ export async function runRevenueScoutIntelligenceV2(input: {
     now,
   });
 
+  const sourceUrls = [
+    ...new Set(
+      validation.claims.flatMap((claim) =>
+        claim.evidence.map((evidence) => evidence.sourceUrl),
+      ),
+    ),
+  ];
+
   return {
     result,
-    sourceUrls: collector.pages.map((page) => page.url),
+    sourceUrls,
     engine: "REVENUESCOUT_INTELLIGENCE_V2",
     model: "RS_CONVERSION_V2",
     collector,
