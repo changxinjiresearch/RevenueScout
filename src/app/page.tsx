@@ -613,7 +613,7 @@ export default async function Home() {
 
       <footer className="disclaimer">
         {user
-          ? "Signed-in Today now uses persisted M2 company, evidence and signal records. Conversion probability remains an early heuristic until M3 persists and calibrates opportunity estimates."
+          ? "Today separates Sales Priority from Research Priority. Intelligence Engine v2 treats missing data as unknown, validates commercial claims across independent source families, and keeps conversion estimates explicitly pre-calibration until real Won/Lost outcomes are available."
           : "Demo mode uses synthetic fixtures only. No demo company should be interpreted as a real discovered business."}
       </footer>
     </main>
