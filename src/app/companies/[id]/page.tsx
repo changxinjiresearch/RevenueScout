@@ -710,7 +710,11 @@ export default async function CompanyIntelligencePage({
 
           {hasMissing ? (
             <div className="missing-strip">
-              <strong>Only these fields still block a confident ICP decision:</strong>
+              <strong>
+                {engineResult
+                  ? "Unknown dimensions worth researching:"
+                  : "Only these fields still block a confident ICP decision:"}
+              </strong>
               <div>
                 {displayMissingFields.map((field) => (
                   <span key={field}>{field}</span>
