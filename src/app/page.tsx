@@ -217,6 +217,9 @@ export default async function Home() {
 
     storedCompanyCount = companies.length;
     const configuredItems: TodayItem[] = [];
+    const runByCompany = new Map(
+      priorityRuns.map((run) => [run.companyId, run]),
+    );
 
     for (const company of companies) {
       const companyEvidence = evidence.filter(
@@ -225,6 +228,7 @@ export default async function Home() {
       const companySignals = signals.filter(
         (signal) => signal.companyId === company.id,
       );
+      const priorityRun = runByCompany.get(company.id) ?? null;
 
       const configured = buildConfiguredOpportunityFromCompany({
         company,
@@ -235,18 +239,61 @@ export default async function Home() {
         links,
       });
 
-      if (!configured) continue;
-
-      const opportunity = configured.opportunity;
-      configuredItems.push({
-        ...opportunity,
-        assessment: assessOpportunity(opportunity),
-        matchedIcpName: configured.matchedIcp.icpName,
-        offeringReason: configured.offeringReason,
-        dealValueBasis: configured.dealValueBasis,
-        companyHref: `/companies/${company.id}`,
-      });
+      if (configured) {
+        const opportunity = configured.opportunity;
+        configuredItems.push({
+          ...opportunity,
+          assessment: assessOpportunity(opportunity),
+          matchedIcpName: configured.matchedIcp.icpName,
+          offeringReason: configured.offeringReason,
+          dealValueBasis: configured.dealValueBasis,
+          companyHref: `/companies/${company.id}`,
+          salesPriorityScore: priorityRun?.salesPriorityScore ?? null,
+          researchPriorityScore: priorityRun?.researchPriorityScore ?? null,
+          potentialScore: priorityRun?.potentialScore ?? null,
+          confidenceScore: priorityRun?.confidenceScore ?? null,
+          priorityAction: priorityRun?.priorityAction ?? null,
+        });
+      }
     }
+
+    const companyById = new Map(companies.map((company) => [company.id, company]));
+
+    researchQueue = priorityRuns
+      .filter(
+        (run) =>
+          run.researchPriorityScore !== null &&
+          run.potentialScore !== null &&
+          run.confidenceScore !== null &&
+          run.conservativeScore !== null &&
+          run.upsideScore !== null &&
+          run.valueOfInformationScore !== null &&
+          (run.priorityAction === "INVESTIGATE_URGENTLY" ||
+            run.priorityAction === "GATHER_MORE_DATA" ||
+            (run.researchPriorityScore ?? 0) > (run.salesPriorityScore ?? 0)),
+      )
+      .map((run) => {
+        const company = companyById.get(run.companyId);
+        return {
+          companyId: run.companyId,
+          companyName: company?.displayName ?? "Unknown company",
+          location: [company?.city, company?.state, company?.country]
+            .filter(Boolean)
+            .join(", "),
+          potentialScore: run.potentialScore ?? 0,
+          confidenceScore: run.confidenceScore ?? 0,
+          conservativeScore: run.conservativeScore ?? 0,
+          upsideScore: run.upsideScore ?? 0,
+          researchPriorityScore: run.researchPriorityScore ?? 0,
+          valueOfInformationScore: run.valueOfInformationScore ?? 0,
+          priorityAction: run.priorityAction ?? "GATHER_MORE_DATA",
+        };
+      })
+      .sort(
+        (a, b) =>
+          b.researchPriorityScore - a.researchPriorityScore ||
+          b.valueOfInformationScore - a.valueOfInformationScore,
+      );
 
     items = configuredItems;
     configVersion = user.configVersion;
@@ -258,11 +305,17 @@ export default async function Home() {
       offeringReason: null,
       dealValueBasis: null,
       companyHref: null,
+      salesPriorityScore: null,
+      researchPriorityScore: null,
+      potentialScore: null,
+      confidenceScore: null,
+      priorityAction: null,
     }));
   }
 
   items.sort(
     (a, b) =>
+      (b.salesPriorityScore ?? -1) - (a.salesPriorityScore ?? -1) ||
       b.assessment.expectedRevenue - a.assessment.expectedRevenue ||
       b.assessment.opportunityScore - a.assessment.opportunityScore,
   );
