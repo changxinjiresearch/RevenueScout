@@ -25,6 +25,7 @@ import {
   evidenceAgeDays,
   evidenceFreshness,
 } from "@/lib/evidence/freshness";
+import type { WebResearchResult } from "@/lib/enrichment/result-types";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,16 @@ type Identifier = {
   provider: string | null;
 };
 
+type ResearchRun = {
+  id: string;
+  status: "RUNNING" | "COMPLETED" | "FAILED";
+  sourceUrls: string[];
+  sourceCount: number;
+  structuredResult: WebResearchResult | null;
+  errorMessage: string | null;
+  completedAt: Date | null;
+};
+
 function triageText(status: string) {
   if (status === "HIGH_POTENTIAL") return "High potential";
   if (status === "MEDIUM_POTENTIAL") return "Medium potential";
@@ -87,6 +98,8 @@ export default async function CompanyIntelligencePage({
     duplicate?: string;
     created?: string;
     triaged?: string;
+    research?: string;
+    research_error?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -253,6 +266,22 @@ export default async function CompanyIntelligencePage({
       `,
     ]);
 
+  const [researchRun] = await sql<ResearchRun[]>`
+    SELECT
+      id,
+      status,
+      source_urls AS "sourceUrls",
+      source_count AS "sourceCount",
+      structured_result AS "structuredResult",
+      error_message AS "errorMessage",
+      completed_at AS "completedAt"
+    FROM web_enrichment_runs
+    WHERE company_id = ${id}
+      AND organization_id = ${user.organizationId}
+    ORDER BY created_at DESC
+    LIMIT 1
+  `;
+
   const configured = buildConfiguredOpportunityFromCompany({
     company: company as CompanyRecord,
     evidence,
@@ -325,6 +354,180 @@ export default async function CompanyIntelligencePage({
         <div className="success-banner">Review decision saved.</div>
       ) : null}
       {query.error ? <div className="error-banner">{query.error}</div> : null}
+      {query.research ? (
+        <div className="success-banner">
+          Automatic web research completed and the company was reassessed.
+        </div>
+      ) : null}
+      {query.research_error ? (
+        <div className="error-banner">
+          Automatic web research failed. Open the research card below for the
+          latest status.
+        </div>
+      ) : null}
+
+      <section className="ai-research-card">
+        <div className="ai-research-heading">
+          <div>
+            <div className="eyebrow">Automatic web enrichment</div>
+            <h2>AI company research</h2>
+            <p>
+              RevenueScout searches public sources for the company website,
+              business activity, size evidence, hiring, expansion and other
+              buying signals, then compares them with your ICP and Offering.
+            </p>
+          </div>
+          <form action={`/api/companies/${id}/research`} method="post">
+            <button className="primary-button" type="submit">
+              {researchRun?.status === "COMPLETED"
+                ? "Refresh research"
+                : "Research company"}
+            </button>
+          </form>
+        </div>
+
+        {!researchRun ? (
+          <div className="ai-research-empty">
+            No automatic web research has been run yet.
+          </div>
+        ) : null}
+
+        {researchRun?.status === "RUNNING" ? (
+          <div className="ai-research-empty">
+            Research is running. Reload this page shortly.
+          </div>
+        ) : null}
+
+        {researchRun?.status === "FAILED" ? (
+          <div className="error-banner">
+            Research failed: {researchRun.errorMessage ?? "Unknown error"}
+          </div>
+        ) : null}
+
+        {researchRun?.status === "COMPLETED" &&
+        researchRun.structuredResult ? (
+          <>
+            <div className="ai-score-row">
+              <div>
+                <span>Commercial potential</span>
+                <strong>
+                  {researchRun.structuredResult.overallPotentialScore}/100
+                </strong>
+              </div>
+              <div>
+                <span>Estimated paid-customer likelihood</span>
+                <strong>
+                  {researchRun.structuredResult.estimatedConversionPercent}%
+                </strong>
+              </div>
+              <div>
+                <span>Evidence confidence</span>
+                <strong>
+                  {researchRun.structuredResult.evidenceConfidence}%
+                </strong>
+              </div>
+              <div>
+                <span>Sources checked</span>
+                <strong>{researchRun.sourceCount}</strong>
+              </div>
+            </div>
+
+            <div className="ai-summary">
+              <strong>
+                {researchRun.structuredResult.assessmentSummary}
+              </strong>
+              <p>
+                Pre-contact estimate only. It is not yet calibrated against
+                historical Won/Lost outcomes.
+              </p>
+            </div>
+
+            <div className="ai-insight-grid">
+              <div>
+                <span className="field-label">Why this company</span>
+                <ul>
+                  {researchRun.structuredResult.whyFit
+                    .slice(0, 4)
+                    .map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+              <div>
+                <span className="field-label">Why now</span>
+                <ul>
+                  {researchRun.structuredResult.whyNow
+                    .slice(0, 4)
+                    .map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+              <div>
+                <span className="field-label">Risks / uncertainty</span>
+                <ul>
+                  {researchRun.structuredResult.risks
+                    .slice(0, 4)
+                    .map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+            </div>
+
+            <div className="ai-auto-fill">
+              <div>
+                <span>Official website</span>
+                <strong>
+                  {researchRun.structuredResult.officialWebsite ||
+                    "Not verified"}
+                </strong>
+              </div>
+              <div>
+                <span>Industry</span>
+                <strong>
+                  {researchRun.structuredResult.industry || "Not verified"}
+                </strong>
+              </div>
+              <div>
+                <span>Employee estimate</span>
+                <strong>
+                  {researchRun.structuredResult.employeeLow >= 0 &&
+                  researchRun.structuredResult.employeeHigh >= 0
+                    ? `${researchRun.structuredResult.employeeLow}–${researchRun.structuredResult.employeeHigh}`
+                    : "Not verified"}
+                </strong>
+              </div>
+              <div>
+                <span>Recommended contact</span>
+                <strong>
+                  {researchRun.structuredResult.recommendedContactRole ||
+                    "Not identified"}
+                </strong>
+              </div>
+            </div>
+
+            <div className="ai-next-action">
+              <span className="field-label">Recommended next action</span>
+              <strong>{researchRun.structuredResult.nextAction}</strong>
+            </div>
+
+            {researchRun.sourceUrls.length > 0 ? (
+              <details className="ai-sources">
+                <summary>
+                  View public sources ({researchRun.sourceCount})
+                </summary>
+                <div>
+                  {researchRun.sourceUrls.slice(0, 8).map((url) => (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {url}
+                    </a>
+                  ))}
+                </div>
+              </details>
+            ) : null}
+          </>
+        ) : null}
+      </section>
 
       <section className="triage-hero">
         <div className="triage-main">
