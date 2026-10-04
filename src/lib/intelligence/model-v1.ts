@@ -563,6 +563,7 @@ export function runConversionModelV1(input: {
           ? "REJECT"
           : "REVIEW",
     unknownDimensions: [],
+    researchTargets: [],
     assessmentSummary,
     whyFit,
     whyNow,
