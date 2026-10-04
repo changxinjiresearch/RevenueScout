@@ -1,9 +1,15 @@
+import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { runCompanyEnrichment, sourceWasRetrieved } from "@/lib/enrichment/responses-client";
 import { WEB_RESEARCH_PROMPT_VERSION } from "@/lib/enrichment/prompt";
 import { publicUrl } from "@/lib/http/public-url";
+
+function observedDate(value: string): Date {
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
 
 export async function POST(
   request: NextRequest,
@@ -100,6 +106,103 @@ export async function POST(
     );
 
     await sql.begin(async (tx) => {
+      for (const observation of verified) {
+        const contentHash = createHash("sha256")
+          .update(
+            [
+              observation.sourceUrl,
+              observation.title,
+              observation.observation,
+            ].join("|"),
+          )
+          .digest("hex");
+
+        const [evidenceItem] = await tx<{ id: string }[]>`
+          INSERT INTO company_evidence (
+            organization_id,
+            company_id,
+            source_type,
+            source_url,
+            source_label,
+            title,
+            excerpt,
+            observed_at,
+            confidence,
+            verification_status,
+            stale_after_days,
+            content_hash,
+            raw_payload,
+            created_by
+          )
+          VALUES (
+            ${user.organizationId},
+            ${id},
+            ${observation.sourceType},
+            ${observation.sourceUrl},
+            ${observation.sourceTitle || "Web research"},
+            ${observation.title},
+            ${observation.observation},
+            ${observedDate(observation.observedAt)},
+            ${Math.max(0, Math.min(1, observation.confidence))},
+            ${observation.verificationStatus},
+            90,
+            ${contentHash},
+            ${JSON.stringify(observation)}::text::jsonb,
+            ${user.id}
+          )
+          ON CONFLICT (company_id, content_hash)
+            WHERE content_hash IS NOT NULL
+          DO UPDATE SET
+            confidence = EXCLUDED.confidence,
+            verification_status = EXCLUDED.verification_status,
+            observed_at = EXCLUDED.observed_at,
+            raw_payload = EXCLUDED.raw_payload
+          RETURNING id
+        `;
+
+        if (
+          evidenceItem &&
+          observation.signalType !== "NONE" &&
+          observation.signalStrength >= 40
+        ) {
+          await tx`
+            INSERT INTO buying_signals (
+              organization_id,
+              company_id,
+              evidence_id,
+              signal_type,
+              label,
+              summary,
+              rationale,
+              strength,
+              confidence,
+              observed_at,
+              verification_status,
+              created_by
+            )
+            SELECT
+              ${user.organizationId},
+              ${id},
+              ${evidenceItem.id},
+              ${observation.signalType},
+              ${observation.title},
+              ${observation.observation},
+              ${observation.signalRationale},
+              ${Math.max(0, Math.min(100, observation.signalStrength))},
+              ${Math.max(0, Math.min(1, observation.confidence))},
+              ${observedDate(observation.observedAt)},
+              ${observation.verificationStatus},
+              ${user.id}
+            WHERE NOT EXISTS (
+              SELECT 1
+              FROM buying_signals
+              WHERE evidence_id = ${evidenceItem.id}
+                AND signal_type = ${observation.signalType}
+            )
+          `;
+        }
+      }
+
       await tx`
         UPDATE companies
         SET
