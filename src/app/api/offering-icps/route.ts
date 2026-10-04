@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { canManageGtm } from "@/lib/permissions";
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest) {
   `;
 
   if (!valid) {
-    const url = new URL(target(formData), request.url);
+    const url = publicUrl(request, target(formData));
     url.searchParams.set("error", "Offering and ICP must belong to this workspace.");
     return NextResponse.redirect(url, 303);
   }
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
     `;
   });
 
-  const url = new URL(target(formData), request.url);
+  const url = publicUrl(request, target(formData));
   url.searchParams.set("saved", "mapping");
   return NextResponse.redirect(url, 303);
 }
