@@ -2,6 +2,7 @@ export type CompanyFormValue = {
   displayName: string;
   legalName: string | null;
   website: string | null;
+  logoUrl?: string | null;
   description: string | null;
   country: string | null;
   state: string | null;
@@ -65,6 +66,15 @@ export function CompanyFields({
           type="url"
           placeholder="https://example.com"
           defaultValue={company?.website ?? ""}
+        />
+      </label>
+      <label>
+        Logo URL
+        <input
+          name="logoUrl"
+          type="url"
+          placeholder="https://example.com/logo.png"
+          defaultValue={company?.logoUrl ?? ""}
         />
       </label>
       <label>
