@@ -217,6 +217,7 @@ export default async function Home() {
 
     storedCompanyCount = companies.length;
     const configuredItems: TodayItem[] = [];
+    const salesCompanyIds = new Set<string>();
     const runByCompany = new Map(
       priorityRuns.map((run) => [run.companyId, run]),
     );
@@ -240,6 +241,7 @@ export default async function Home() {
       });
 
       if (configured) {
+        salesCompanyIds.add(company.id);
         const opportunity = configured.opportunity;
         configuredItems.push({
           ...opportunity,
@@ -268,9 +270,11 @@ export default async function Home() {
           run.conservativeScore !== null &&
           run.upsideScore !== null &&
           run.valueOfInformationScore !== null &&
+          run.priorityAction !== "REJECT" &&
           (run.priorityAction === "INVESTIGATE_URGENTLY" ||
             run.priorityAction === "GATHER_MORE_DATA" ||
-            (run.researchPriorityScore ?? 0) > (run.salesPriorityScore ?? 0)),
+            (run.researchPriorityScore ?? 0) > (run.salesPriorityScore ?? 0) ||
+            !salesCompanyIds.has(run.companyId)),
       )
       .map((run) => {
         const company = companyById.get(run.companyId);
