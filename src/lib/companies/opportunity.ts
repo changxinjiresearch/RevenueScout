@@ -3,18 +3,18 @@ import type {
   ConfidenceLabel,
   OpportunityInput,
   SignalType,
-} from "@/lib/domain/types";
+} from "../domain/types";
 import type {
   CandidateCompanyFacts,
   IcpRule,
   OfferingConfig,
   OfferingIcpLink,
-} from "@/lib/domain/configured-opportunity";
-import { configureOpportunity } from "@/lib/domain/configured-opportunity";
+} from "../domain/configured-opportunity";
+import { configureOpportunity } from "../domain/configured-opportunity";
 import {
   evidenceFreshness,
   freshnessConfidenceMultiplier,
-} from "@/lib/evidence/freshness";
+} from "../evidence/freshness";
 
 export type CompanyRecord = {
   id: string;
