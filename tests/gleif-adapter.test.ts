@@ -17,8 +17,14 @@ describe("GLEIF discovery adapter", () => {
             postalCode: "2000",
           },
           jurisdiction: "AU",
+          category: "GENERAL",
           status: "ACTIVE",
-          legalForm: { other: "Proprietary company" },
+          entityCreationDate: "2018-05-01T00:00:00Z",
+          registrationAuthority: {
+            registrationAuthorityID: "RA000013",
+            registrationAuthorityEntityID: "123456789",
+          },
+          legalForm: { id: "TXVC", other: "Proprietary company" },
         },
         registration: {
           status: "ISSUED",
@@ -35,5 +41,15 @@ describe("GLEIF discovery adapter", () => {
     expect(result?.industry).toBeNull();
     expect(result?.employeeCount).toBeNull();
     expect(result?.verificationStatus).toBe("CONFIRMED");
+    expect(result?.legalEntityCategory).toBe("GENERAL");
+    expect(result?.entityStatus).toBe("ACTIVE");
+    expect(result?.registrationStatus).toBe("ISSUED");
+    expect(result?.foundedYear).toBe(2018);
+    expect(result?.sourceUrl).toBe(
+      "https://search.gleif.org/#/record/12345678901234567890",
+    );
+    expect(result?.rawSourceUrl).toBe(
+      "https://api.gleif.org/api/v1/lei-records/12345678901234567890",
+    );
   });
 });
