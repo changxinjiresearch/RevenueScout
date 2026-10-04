@@ -28,14 +28,17 @@ jobs:
         with:
           node-version: 22
 
+      - name: Install pnpm
+        run: npm install --global pnpm@12.8.1
+
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck
-        run: npm run typecheck
+        run: pnpm run typecheck
 
       - name: Test
-        run: npm test
+        run: pnpm test
 
       - name: Build
-        run: npm run build
+        run: pnpm run build
