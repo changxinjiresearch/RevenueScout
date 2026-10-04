@@ -11,26 +11,32 @@ import {
   type EvidenceRecord,
   type SignalRecord,
 } from "@/lib/companies/opportunity";
+import {
+  assessCompanyTriage,
+  type TriageCompany,
+} from "@/lib/companies/triage";
 import type {
   IcpRule,
   OfferingConfig,
   OfferingIcpLink,
 } from "@/lib/domain/configured-opportunity";
-import { assessOpportunity } from "@/lib/domain/opportunity-score";
+import { db } from "@/lib/db";
 import {
   evidenceAgeDays,
   evidenceFreshness,
 } from "@/lib/evidence/freshness";
-import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-type CompanyView = CompanyRecord &
+type CompanyView = TriageCompany &
   CompanyFormValue & {
     legalName: string | null;
     address: string | null;
     productsServices: string | null;
     sourceOrigin: string;
+    providerLastUpdatedAt: Date | null;
+    registrationAuthority: string | null;
+    registeredAs: string | null;
     createdAt: Date;
     updatedAt: Date;
   };
@@ -55,13 +61,19 @@ type Identifier = {
   provider: string | null;
 };
 
-type ImportOrigin = {
-  provider: string;
-  query: string;
-  duplicateDetected: boolean;
-  duplicateReason: string | null;
-  createdAt: Date;
-};
+function triageText(status: string) {
+  if (status === "HIGH_POTENTIAL") return "High potential";
+  if (status === "MEDIUM_POTENTIAL") return "Medium potential";
+  if (status === "LOW_POTENTIAL") return "Low potential";
+  return "Needs enrichment";
+}
+
+function triageClass(status: string) {
+  if (status === "HIGH_POTENTIAL") return "triage-high";
+  if (status === "MEDIUM_POTENTIAL") return "triage-medium";
+  if (status === "LOW_POTENTIAL") return "triage-low";
+  return "triage-review";
+}
 
 export default async function CompanyIntelligencePage({
   params,
@@ -74,6 +86,7 @@ export default async function CompanyIntelligencePage({
     imported?: string;
     duplicate?: string;
     created?: string;
+    triaged?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -81,7 +94,7 @@ export default async function CompanyIntelligencePage({
   const query = await searchParams;
   const sql = db();
 
-  const [company] = await sql<CompanyView[]>`
+  const [company] = await sql<CompanyView[]>\`
     SELECT
       id,
       display_name AS "displayName",
@@ -113,19 +126,28 @@ export default async function CompanyIntelligencePage({
       entity_type AS "entityType",
       relationship_status AS "relationshipStatus",
       source_origin AS "sourceOrigin",
+      legal_entity_category AS "legalEntityCategory",
+      legal_entity_subcategory AS "legalEntitySubcategory",
+      entity_status AS "entityStatus",
+      registration_status AS "registrationStatus",
+      jurisdiction,
+      legal_form_code AS "legalFormCode",
+      registration_authority AS "registrationAuthority",
+      registered_as AS "registeredAs",
+      provider_last_updated_at AS "providerLastUpdatedAt",
       created_at AS "createdAt",
       updated_at AS "updatedAt"
     FROM companies
     WHERE id = ${id}
       AND organization_id = ${user.organizationId}
     LIMIT 1
-  `;
+  \`;
 
   if (!company) notFound();
 
-  const [evidence, signals, identifiers, imports, icps, offerings, links] =
+  const [evidence, signals, identifiers, icps, offerings, links] =
     await Promise.all([
-      sql<EvidenceView[]>`
+      sql<EvidenceView[]>\`
         SELECT
           id,
           company_id AS "companyId",
@@ -144,8 +166,8 @@ export default async function CompanyIntelligencePage({
         WHERE company_id = ${id}
           AND organization_id = ${user.organizationId}
         ORDER BY observed_at DESC, created_at DESC
-      `,
-      sql<SignalView[]>`
+      \`,
+      sql<SignalView[]>\`
         SELECT
           s.id,
           s.company_id AS "companyId",
@@ -166,8 +188,8 @@ export default async function CompanyIntelligencePage({
         WHERE s.company_id = ${id}
           AND s.organization_id = ${user.organizationId}
         ORDER BY s.observed_at DESC, s.created_at DESC
-      `,
-      sql<Identifier[]>`
+      \`,
+      sql<Identifier[]>\`
         SELECT
           identifier_type AS "identifierType",
           identifier_value AS "identifierValue",
@@ -175,20 +197,8 @@ export default async function CompanyIntelligencePage({
         FROM company_identifiers
         WHERE company_id = ${id}
         ORDER BY identifier_type
-      `,
-      sql<ImportOrigin[]>`
-        SELECT
-          dr.provider,
-          dr.query,
-          di.duplicate_detected AS "duplicateDetected",
-          di.duplicate_reason AS "duplicateReason",
-          di.created_at AS "createdAt"
-        FROM discovery_imports di
-        JOIN discovery_runs dr ON dr.id = di.discovery_run_id
-        WHERE di.company_id = ${id}
-        ORDER BY di.created_at DESC
-      `,
-      sql<IcpRule[]>`
+      \`,
+      sql<IcpRule[]>\`
         SELECT
           id,
           name,
@@ -222,8 +232,8 @@ export default async function CompanyIntelligencePage({
           employee_exclude_above AS "employeeExcludeAbove"
         FROM icps
         WHERE organization_id = ${user.organizationId}
-      `,
-      sql<OfferingConfig[]>`
+      \`,
+      sql<OfferingConfig[]>\`
         SELECT
           id,
           name,
@@ -232,28 +242,36 @@ export default async function CompanyIntelligencePage({
           ideal_contract_value::float8 AS "idealContractValue"
         FROM offerings
         WHERE organization_id = ${user.organizationId}
-      `,
-      sql<OfferingIcpLink[]>`
+      \`,
+      sql<OfferingIcpLink[]>\`
         SELECT
           oi.offering_id AS "offeringId",
           oi.icp_id AS "icpId"
         FROM offering_icps oi
         JOIN offerings o ON o.id = oi.offering_id
         WHERE o.organization_id = ${user.organizationId}
-      `,
+      \`,
     ]);
 
   const configured = buildConfiguredOpportunityFromCompany({
-    company,
+    company: company as CompanyRecord,
     evidence,
     signals,
     icps,
     offerings,
     links,
   });
-  const assessment = configured
-    ? assessOpportunity(configured.opportunity)
-    : null;
+
+  const triage = assessCompanyTriage({
+    company,
+    configured,
+    icps,
+    signals,
+  });
+
+  const primaryEvidence = evidence[0] ?? null;
+  const lei = identifiers.find((item) => item.identifierType === "LEI");
+  const hasMissing = triage.missingFields.length > 0;
 
   return (
     <main className="setup-shell">
@@ -268,424 +286,341 @@ export default async function CompanyIntelligencePage({
         </div>
       </nav>
 
-      <header className="company-intel-header">
+      <header className="fast-review-header">
         <div>
-          <div className="eyebrow">Company Intelligence</div>
+          <div className="eyebrow">Fast company review</div>
           <h1>{company.displayName}</h1>
           <p>
-            {company.industry ?? "Industry not yet enriched"} ·{" "}
-            {[company.city, company.state, company.country].filter(Boolean).join(", ") ||
-              "Location not yet enriched"}
+            {[company.city, company.state, company.country]
+              .filter(Boolean)
+              .join(", ") || "Location not available"}
           </p>
-          <div className="company-badges">
-            <span>{company.sourceOrigin}</span>
-            <span>{company.relationshipStatus}</span>
-            <span>{evidence.length} evidence</span>
-            <span>{signals.length} signals</span>
-          </div>
         </div>
-
-        <aside className="company-decision-card">
-          {configured && assessment ? (
-            <>
-              <span>Current decision view</span>
-              <strong>{assessment.opportunityScore}/100</strong>
-              <small>
-                ICP: {configured.matchedIcp.icpName} ·{" "}
-                {configured.opportunity.recommendedOffering}
-              </small>
-            </>
-          ) : (
-            <>
-              <span>Current decision view</span>
-              <strong>Not qualified</strong>
-              <small>
-                Complete missing company intelligence or review ICP qualification gates.
-              </small>
-            </>
-          )}
-        </aside>
+        {primaryEvidence?.sourceUrl ? (
+          <a
+            className="secondary-link"
+            href={primaryEvidence.sourceUrl}
+            target="_blank"
+            rel="noreferrer"
+          >
+            View source
+          </a>
+        ) : null}
       </header>
 
-      {query.saved ? <div className="success-banner">Saved successfully.</div> : null}
-      {query.created ? <div className="success-banner">Company created.</div> : null}
       {query.imported ? (
         <div className="success-banner">
-          Imported from a real external discovery source. Enrich missing ICP fields below.
+          Imported. RevenueScout has already filled every field available from
+          the source and assessed the company below.
         </div>
       ) : null}
       {query.duplicate ? (
         <div className="warning-banner">
-          Duplicate prevention matched this existing company. The external evidence
-          was attached here instead of creating another company record.
+          This matched an existing company, so the new source evidence was
+          attached instead of creating a duplicate.
         </div>
+      ) : null}
+      {query.saved ? <div className="success-banner">Updated.</div> : null}
+      {query.triaged ? (
+        <div className="success-banner">Review decision saved.</div>
       ) : null}
       {query.error ? <div className="error-banner">{query.error}</div> : null}
 
-      <section className="intel-grid">
-        <article className="intel-panel">
-          <div className="intel-panel-heading">
-            <div>
-              <div className="eyebrow">Qualification</div>
-              <h2>Company profile</h2>
-            </div>
-            <span className={configured ? "qualified-pill" : "pending-pill"}>
-              {configured ? "Qualified" : "Needs enrichment / not qualified"}
+      <section className="triage-hero">
+        <div className="triage-main">
+          <div className="triage-label-row">
+            <span className={`triage-pill ${triageClass(triage.status)}`}>
+              {triageText(triage.status)}
             </span>
+            {triage.score !== null ? (
+              <span className="triage-score">{triage.score}/100</span>
+            ) : null}
           </div>
+          <h2>{triage.headline}</h2>
+          <ul className="triage-reasons">
+            {triage.reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
 
-          <dl className="company-facts">
-            <div><dt>Legal name</dt><dd>{company.legalName ?? "—"}</dd></div>
-            <div><dt>Website</dt><dd>{company.website ?? "—"}</dd></div>
-            <div><dt>Industry</dt><dd>{company.industry ?? "—"}</dd></div>
-            <div><dt>Employees</dt><dd>{company.employeeCount ?? company.employeeRange ?? "—"}</dd></div>
-            <div><dt>Founded</dt><dd>{company.foundedYear ?? "—"}</dd></div>
-            <div><dt>Company type</dt><dd>{company.companyType ?? company.entityType}</dd></div>
-          </dl>
-
-          {identifiers.length > 0 ? (
-            <div className="identifier-list">
-              {identifiers.map((identifier) => (
-                <span key={`${identifier.identifierType}-${identifier.identifierValue}`}>
-                  {identifier.identifierType}: {identifier.identifierValue}
-                </span>
-              ))}
+          {hasMissing ? (
+            <div className="missing-strip">
+              <strong>Only these fields still block a confident ICP decision:</strong>
+              <div>
+                {triage.missingFields.map((field) => (
+                  <span key={field}>{field}</span>
+                ))}
+              </div>
             </div>
           ) : null}
+        </div>
 
-          {imports.length > 0 ? (
-            <div className="source-origin-box">
-              <strong>Discovery provenance</strong>
-              {imports.map((origin, index) => (
-                <p key={index}>
-                  {origin.provider} search “{origin.query}”
-                  {origin.duplicateDetected
-                    ? ` · deduplicated by ${origin.duplicateReason}`
-                    : " · imported as new company"}
-                </p>
-              ))}
+        <aside className="triage-action-panel">
+          <span className="field-label">Recommended action</span>
+          <strong>
+            {triage.recommendation === "ADD_TO_PIPELINE"
+              ? "Add to pipeline"
+              : triage.recommendation === "REJECT"
+                ? "Reject"
+                : "Review"}
+          </strong>
+          <p>
+            Human confirmation stays final. One click is enough; you do not
+            need to maintain the full company record manually.
+          </p>
+
+          <div className="triage-actions">
+            <form action={`/api/companies/${id}/triage`} method="post">
+              <input type="hidden" name="action" value="pipeline" />
+              <button className="primary-button" type="submit">
+                Add to pipeline
+              </button>
+            </form>
+            <form action={`/api/companies/${id}/triage`} method="post">
+              <input type="hidden" name="action" value="review" />
+              <button className="secondary-button" type="submit">
+                Keep for review
+              </button>
+            </form>
+            <form action={`/api/companies/${id}/triage`} method="post">
+              <input type="hidden" name="action" value="reject" />
+              <button className="danger-button" type="submit">
+                Reject
+              </button>
+            </form>
+          </div>
+        </aside>
+      </section>
+
+      <section className="fast-facts-grid">
+        <article className="fast-panel">
+          <div className="eyebrow">Auto-filled from source</div>
+          <h2>Key facts</h2>
+          <dl className="company-facts fast-facts">
+            <div><dt>Legal name</dt><dd>{company.legalName ?? "—"}</dd></div>
+            <div><dt>Entity category</dt><dd>{company.legalEntityCategory ?? "—"}</dd></div>
+            <div><dt>Entity status</dt><dd>{company.entityStatus ?? "—"}</dd></div>
+            <div><dt>Registration</dt><dd>{company.registrationStatus ?? "—"}</dd></div>
+            <div><dt>Legal form</dt><dd>{company.companyType ?? company.legalFormCode ?? "—"}</dd></div>
+            <div><dt>Jurisdiction</dt><dd>{company.jurisdiction ?? "—"}</dd></div>
+            <div><dt>Industry</dt><dd>{company.industry ?? "Not available from source"}</dd></div>
+            <div><dt>Employees</dt><dd>{company.employeeCount ?? "Not available from source"}</dd></div>
+          </dl>
+
+          {lei ? (
+            <div className="identifier-list">
+              <span>LEI: {lei.identifierValue}</span>
+              {company.registeredAs ? (
+                <span>Registered as: {company.registeredAs}</span>
+              ) : null}
             </div>
           ) : null}
         </article>
 
-        <article className="intel-panel">
-          <div className="eyebrow">Why now</div>
-          <h2>Buying-signal summary</h2>
-          {signals.length === 0 ? (
-            <div className="intel-empty">
-              No buying signal yet. A company can be a good ICP match without
-              having evidence that now is the right time to contact it.
-            </div>
-          ) : (
+        <article className="fast-panel">
+          <div className="eyebrow">Buying timing</div>
+          <h2>{signals.length > 0 ? "Why now" : "No current buying signal"}</h2>
+          {signals.length > 0 ? (
             <>
               <strong className="why-now-lead">
                 {configured?.opportunity.whyNow ?? signals[0].summary}
               </strong>
               <p>
                 {configured?.opportunity.problemHypothesis ??
-                  "Review evidence before forming a problem hypothesis."}
+                  "Review the evidence before forming a business-problem hypothesis."}
               </p>
             </>
+          ) : (
+            <p className="muted-copy">
+              The source verifies the company exists, but it does not prove that
+              the company is buying now. RevenueScout will keep identity and
+              buying intent separate.
+            </p>
           )}
         </article>
       </section>
 
-      <section className="setup-section">
-        <div className="setup-section-heading">
-          <div><span className="step-number">01</span><h2>Signal timeline</h2></div>
-          <p>
-            Signals are events, not facts invented by the model. Every signal
-            below must point to a stored evidence item.
-          </p>
-        </div>
-
-        {signals.length === 0 ? (
-          <div className="config-card blocked-card">No signals recorded yet.</div>
-        ) : (
-          <div className="timeline">
-            {signals.map((signal) => (
-              <article className="timeline-item" key={signal.id}>
-                <div className="timeline-date">
-                  {new Date(signal.observedAt).toLocaleDateString("en-AU", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </div>
-                <div>
-                  <div className="signal-title-row">
-                    <span className="signal-chip">
-                      {signal.signalType.replaceAll("_", " ")}
-                    </span>
-                    <strong>{signal.label}</strong>
-                  </div>
-                  <p>{signal.summary}</p>
-                  <small>
-                    {signal.verificationStatus} · confidence{" "}
-                    {Math.round(signal.confidence * 100)}% · source:{" "}
-                    {signal.sourceUrl ? (
-                      <a href={signal.sourceUrl} target="_blank" rel="noreferrer">
-                        {signal.sourceLabel}
-                      </a>
-                    ) : (
-                      signal.sourceLabel
-                    )}
-                  </small>
-                  <details>
-                    <summary>Why this may matter</summary>
-                    <p>{signal.rationale}</p>
-                  </details>
-                </div>
-              </article>
-            ))}
+      {hasMissing && triage.status === "NEEDS_ENRICHMENT" ? (
+        <section className="essential-enrichment">
+          <div>
+            <div className="eyebrow">Minimal enrichment</div>
+            <h2>Fill only what changes the decision</h2>
+            <p>
+              Everything else stays auto-filled. These are the only missing
+              ICP fields currently preventing RevenueScout from judging fit.
+            </p>
           </div>
-        )}
-      </section>
 
-      <section className="setup-section">
-        <div className="setup-section-heading">
-          <div><span className="step-number">02</span><h2>Evidence</h2></div>
-          <p>
-            Evidence preserves source, observation date, verification,
-            confidence and freshness. Stale evidence remains visible instead of
-            silently disappearing.
-          </p>
-        </div>
-
-        {evidence.length === 0 ? (
-          <div className="config-card blocked-card">No evidence recorded yet.</div>
-        ) : (
-          <div className="evidence-list">
-            {evidence.map((item) => {
-              const freshness = evidenceFreshness(
-                item.observedAt,
-                item.staleAfterDays,
-              );
-              const age = evidenceAgeDays(item.observedAt);
-
-              return (
-                <article className="evidence-card" key={item.id}>
-                  <div className="evidence-card-top">
-                    <div>
-                      <span className="source-badge">{item.sourceType}</span>
-                      <h3>{item.title}</h3>
-                    </div>
-                    <div className="evidence-status">
-                      <span>{item.verificationStatus}</span>
-                      <span>{freshness}</span>
-                    </div>
-                  </div>
-                  <p>{item.excerpt}</p>
-                  <div className="evidence-meta">
-                    <span>Observed {age === null ? "unknown" : `${age} days ago`}</span>
-                    <span>Confidence {Math.round(item.confidence * 100)}%</span>
-                    <span>Stale after {item.staleAfterDays} days</span>
-                    {item.sourceUrl ? (
-                      <a href={item.sourceUrl} target="_blank" rel="noreferrer">
-                        Open source
-                      </a>
-                    ) : null}
-                  </div>
-                </article>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      <section className="setup-section">
-        <div className="setup-section-heading">
-          <div><span className="step-number">03</span><h2>Enrich company</h2></div>
-          <p>
-            External registries often lack industry and headcount. RevenueScout
-            leaves missing fields blank instead of guessing; enrich them here
-            before ICP qualification.
-          </p>
-        </div>
-        <details className="config-card">
-          <summary className="config-summary">
-            <span>
-              <strong>Edit company intelligence</strong>
-              <small>These fields feed directly into ICP qualification.</small>
-            </span>
-            <span>Open</span>
-          </summary>
-          <form className="form-grid edit-form" action={`/api/companies/${id}`} method="post">
-            <CompanyFields company={company} includeRelationship />
-            <div className="span-2 form-actions">
-              <button className="primary-button" type="submit">
-                Save company intelligence
-              </button>
-            </div>
-          </form>
-        </details>
-      </section>
-
-      <section className="two-form-grid">
-        <article className="setup-section">
-          <div className="setup-section-heading compact-heading">
-            <div><span className="step-number">04</span><h2>Add evidence</h2></div>
-          </div>
           <form
-            className="config-card stack-form"
-            action={`/api/companies/${id}/evidence`}
+            className="essential-form"
+            action={`/api/companies/${id}/essentials`}
             method="post"
           >
-            <label>
-              Source type
-              <select name="sourceType" defaultValue="COMPANY_WEBSITE">
-                <option value="COMPANY_WEBSITE">Company website</option>
-                <option value="NEWS">News</option>
-                <option value="JOB_BOARD">Job board</option>
-                <option value="TENDER">Tender / procurement</option>
-                <option value="REGISTRY">Registry</option>
-                <option value="MANUAL">Manual observation</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </label>
-            <label>
-              Source label
-              <input name="sourceLabel" placeholder="Company careers page" required />
-            </label>
-            <label>
-              Source URL
-              <input name="sourceUrl" type="url" placeholder="https://…" />
-            </label>
-            <label>
-              Evidence title
-              <input name="title" placeholder="12 operations roles advertised" required />
-            </label>
-            <label>
-              Evidence excerpt / observation
-              <textarea
-                name="excerpt"
-                rows={4}
-                placeholder="Record only what the source actually supports."
-                required
-              />
-            </label>
-            <label>
-              Observed date
-              <input
-                name="observedAt"
-                type="date"
-                defaultValue={new Date().toISOString().slice(0, 10)}
-                required
-              />
-            </label>
-            <label>
-              Verification
-              <select name="verificationStatus" defaultValue="LIKELY">
-                <option value="CONFIRMED">Confirmed</option>
-                <option value="LIKELY">Likely</option>
-                <option value="UNVERIFIED">Unverified</option>
-                <option value="OUTDATED">Outdated</option>
-              </select>
-            </label>
-            <label>
-              Confidence
-              <select name="confidence" defaultValue="0.8">
-                <option value="0.98">98% · high</option>
-                <option value="0.8">80% · medium-high</option>
-                <option value="0.6">60% · medium</option>
-                <option value="0.4">40% · low</option>
-              </select>
-            </label>
-            <label>
-              Stale after days
-              <input name="staleAfterDays" type="number" min="1" defaultValue="90" />
-            </label>
-            <button className="primary-button" type="submit">Save evidence</button>
+            {triage.missingFields.includes("Industry") ? (
+              <label>
+                Industry
+                <input name="industry" placeholder="e.g. Logistics" required />
+              </label>
+            ) : null}
+            {triage.missingFields.includes("Subindustry") ? (
+              <label>
+                Subindustry
+                <input name="subindustry" placeholder="e.g. Freight" required />
+              </label>
+            ) : null}
+            {triage.missingFields.includes("Employee count") ? (
+              <label>
+                Employee count
+                <input name="employeeCount" type="number" min="1" required />
+              </label>
+            ) : null}
+            {triage.missingFields.includes("Founded year") ? (
+              <label>
+                Founded year
+                <input name="foundedYear" type="number" min="1800" max="2100" required />
+              </label>
+            ) : null}
+            {triage.missingFields.includes("Company type") ? (
+              <label>
+                Company type
+                <select name="companyType" defaultValue="Private">
+                  <option value="Private">Private</option>
+                  <option value="Public">Public</option>
+                  <option value="Other">Other</option>
+                </select>
+              </label>
+            ) : null}
+            {triage.missingFields.includes("Country") ? (
+              <label>
+                Country
+                <input name="country" required />
+              </label>
+            ) : null}
+            {triage.missingFields.includes("State / region") ? (
+              <label>
+                State / region
+                <input name="state" required />
+              </label>
+            ) : null}
+            {triage.missingFields.includes("City") ? (
+              <label>
+                City
+                <input name="city" required />
+              </label>
+            ) : null}
+            {triage.missingFields.includes("Service regions") ? (
+              <label>
+                Service regions
+                <input
+                  name="serviceRegions"
+                  placeholder="NSW, VIC, Australia"
+                  required
+                />
+              </label>
+            ) : null}
+            <button className="primary-button" type="submit">
+              Save & reassess
+            </button>
           </form>
-        </article>
+        </section>
+      ) : null}
 
-        <article className="setup-section">
-          <div className="setup-section-heading compact-heading">
-            <div><span className="step-number">05</span><h2>Create signal</h2></div>
-          </div>
-          {evidence.length === 0 ? (
-            <div className="config-card blocked-card">
-              Add evidence first. RevenueScout does not allow an evidence-free
-              buying signal.
-            </div>
-          ) : (
+      <details className="advanced-review">
+        <summary>
+          <span>
+            <strong>Advanced details</strong>
+            <small>Evidence, signals and full company editing</small>
+          </span>
+          <span>Open only if needed</span>
+        </summary>
+
+        <div className="advanced-review-body">
+          <section>
+            <h3>Evidence</h3>
+            {evidence.length === 0 ? (
+              <p className="muted-copy">No evidence recorded.</p>
+            ) : (
+              <div className="evidence-list">
+                {evidence.map((item) => {
+                  const freshness = evidenceFreshness(
+                    item.observedAt,
+                    item.staleAfterDays,
+                  );
+                  const age = evidenceAgeDays(item.observedAt);
+
+                  return (
+                    <article className="evidence-card" key={item.id}>
+                      <div className="evidence-card-top">
+                        <div>
+                          <span className="source-badge">{item.sourceType}</span>
+                          <h3>{item.title}</h3>
+                        </div>
+                        <div className="evidence-status">
+                          <span>{item.verificationStatus}</span>
+                          <span>{freshness}</span>
+                        </div>
+                      </div>
+                      <p>{item.excerpt}</p>
+                      <div className="evidence-meta">
+                        <span>
+                          Observed {age === null ? "unknown" : `${age} days ago`}
+                        </span>
+                        <span>Confidence {Math.round(item.confidence * 100)}%</span>
+                        {item.sourceUrl ? (
+                          <a
+                            href={item.sourceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            View source
+                          </a>
+                        ) : null}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+
+          <section>
+            <h3>Signal timeline</h3>
+            {signals.length === 0 ? (
+              <p className="muted-copy">No evidence-backed buying signal yet.</p>
+            ) : (
+              <div className="timeline">
+                {signals.map((signal) => (
+                  <article className="timeline-item" key={signal.id}>
+                    <div className="timeline-date">
+                      {new Date(signal.observedAt).toLocaleDateString("en-AU")}
+                    </div>
+                    <div>
+                      <strong>{signal.label}</strong>
+                      <p>{signal.summary}</p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <details className="nested-advanced">
+            <summary>Full company editor</summary>
             <form
-              className="config-card stack-form"
-              action={`/api/companies/${id}/signals`}
+              className="form-grid edit-form"
+              action={`/api/companies/${id}`}
               method="post"
             >
-              <label>
-                Evidence
-                <select name="evidenceId">
-                  {evidence.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Signal type
-                <select name="signalType">
-                  <option value="HIRING">Hiring</option>
-                  <option value="EXPANSION">Expansion</option>
-                  <option value="FUNDING">Funding</option>
-                  <option value="LEADERSHIP">Leadership</option>
-                  <option value="TECHNOLOGY">Technology</option>
-                  <option value="OPERATIONAL_PAIN">Potential operational pain</option>
-                  <option value="GROWTH">Growth</option>
-                  <option value="PROCUREMENT">Procurement / tender</option>
-                </select>
-              </label>
-              <label>
-                Signal label
-                <input name="label" placeholder="Operations hiring increase" required />
-              </label>
-              <label>
-                What was observed?
-                <textarea
-                  name="summary"
-                  rows={3}
-                  placeholder="Describe the event without adding unsupported conclusions."
-                  required
-                />
-              </label>
-              <label>
-                Why might this affect buying timing?
-                <textarea
-                  name="rationale"
-                  rows={3}
-                  placeholder="Explain the commercial hypothesis."
-                  required
-                />
-              </label>
-              <label>
-                Strength
-                <input name="strength" type="number" min="0" max="100" defaultValue="70" />
-              </label>
-              <label>
-                Confidence
-                <select name="confidence" defaultValue="0.8">
-                  <option value="0.95">95%</option>
-                  <option value="0.8">80%</option>
-                  <option value="0.6">60%</option>
-                  <option value="0.4">40%</option>
-                </select>
-              </label>
-              <label>
-                Verification
-                <select name="verificationStatus" defaultValue="LIKELY">
-                  <option value="CONFIRMED">Confirmed</option>
-                  <option value="LIKELY">Likely</option>
-                  <option value="UNVERIFIED">Unverified</option>
-                  <option value="OUTDATED">Outdated</option>
-                </select>
-              </label>
-              <button className="primary-button" type="submit">Create signal</button>
+              <CompanyFields company={company} includeRelationship />
+              <div className="span-2 form-actions">
+                <button className="primary-button" type="submit">
+                  Save full record
+                </button>
+              </div>
             </form>
-          )}
-        </article>
-      </section>
+          </details>
+        </div>
+      </details>
     </main>
   );
 }
