@@ -20,6 +20,23 @@ export type ResearchResponsePayload = {
   output?: ResponseItem[];
 };
 
+type OpenAIErrorPayload = {
+  error?: {
+    message?: string;
+    type?: string;
+    code?: string | null;
+    param?: string | null;
+  };
+};
+
+export type OpenAIResearchError = {
+  status: number;
+  code: string;
+  type: string;
+  message: string;
+  retryable: boolean;
+};
+
 function outputText(payload: ResearchResponsePayload): string {
   if (payload.output_text) return payload.output_text;
 
@@ -72,6 +89,99 @@ export function sourceWasRetrieved(
   return retrievedUrls.some((url) => host(url) === sourceHost);
 }
 
+const NON_RETRYABLE_429_CODES = new Set([
+  "credit_balance_exhausted",
+  "organization_usage_limit_exceeded",
+  "organization_spend_limit_exceeded",
+  "project_spend_limit_exceeded",
+]);
+
+export function classifyOpenAIResearchError(
+  status: number,
+  payload: OpenAIErrorPayload,
+): OpenAIResearchError {
+  const code = String(payload.error?.code ?? "unknown");
+  const type = String(payload.error?.type ?? "unknown");
+  const providerMessage = String(payload.error?.message ?? "").trim();
+
+  if (status === 429 && code === "credit_balance_exhausted") {
+    return {
+      status,
+      code,
+      type,
+      retryable: false,
+      message:
+        "OpenAI API credit balance is exhausted. Add API credits in Platform billing, then try again.",
+    };
+  }
+
+  if (status === 429 && code === "project_spend_limit_exceeded") {
+    return {
+      status,
+      code,
+      type,
+      retryable: false,
+      message:
+        "OpenAI project spend limit has been reached. Raise the project spend limit, then try again.",
+    };
+  }
+
+  if (status === 429 && code === "organization_spend_limit_exceeded") {
+    return {
+      status,
+      code,
+      type,
+      retryable: false,
+      message:
+        "OpenAI organization spend limit has been reached. Raise the organization spend limit, then try again.",
+    };
+  }
+
+  if (status === 429 && code === "organization_usage_limit_exceeded") {
+    return {
+      status,
+      code,
+      type,
+      retryable: false,
+      message:
+        "OpenAI organization usage limit has been reached. Review the organization usage limit, then try again.",
+    };
+  }
+
+  const retryable =
+    status === 429 &&
+    !NON_RETRYABLE_429_CODES.has(code) &&
+    (code.includes("rate_limit") ||
+      type.includes("rate_limit") ||
+      code === "unknown");
+
+  const detail = providerMessage
+    ? providerMessage.slice(0, 280)
+    : `HTTP ${status}`;
+
+  return {
+    status,
+    code,
+    type,
+    retryable,
+    message: `OpenAI API error [${code}]: ${detail}`,
+  };
+}
+
+function retryDelayMs(response: Response): number {
+  const raw = response.headers.get("retry-after");
+  if (!raw) return 1200;
+  const seconds = Number(raw);
+  if (Number.isFinite(seconds) && seconds >= 0) {
+    return Math.min(5000, Math.max(500, seconds * 1000));
+  }
+  return 1200;
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 export async function runCompanyEnrichment(
   context: unknown,
 ): Promise<{
@@ -86,47 +196,68 @@ export async function runCompanyEnrichment(
   }
 
   const model =
-    process.env.OPENAI_ENRICHMENT_MODEL?.trim() || "gpt-5.6";
+    process.env.OPENAI_ENRICHMENT_MODEL?.trim() || "gpt-6-luna";
 
-  const response = await fetch(RESPONSES_ENDPOINT, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify({
-      model,
-      store: false,
-      tools: [{ type: "web_search" }],
-      tool_choice: "auto",
-      input: buildWebResearchPrompt(context),
-      text: {
-        format: {
-          type: "json_schema",
-          name: "revenuescout_company_enrichment",
-          strict: true,
-          schema: COMPANY_RESEARCH_SCHEMA,
-        },
+  const requestBody = JSON.stringify({
+    model,
+    store: false,
+    tools: [{ type: "web_search" }],
+    tool_choice: "auto",
+    input: buildWebResearchPrompt(context),
+    text: {
+      format: {
+        type: "json_schema",
+        name: "revenuescout_company_enrichment",
+        strict: true,
+        schema: COMPANY_RESEARCH_SCHEMA,
       },
-    }),
-    signal: AbortSignal.timeout(75_000),
+    },
   });
 
-  const payload = (await response.json()) as ResearchResponsePayload;
+  let lastError: OpenAIResearchError | null = null;
 
-  if (!response.ok) {
-    throw new Error(
-      `Research request failed with HTTP ${response.status}.`,
-    );
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const response = await fetch(RESPONSES_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: requestBody,
+      signal: AbortSignal.timeout(75_000),
+    });
+
+    const payload = (await response.json()) as
+      | ResearchResponsePayload
+      | OpenAIErrorPayload;
+
+    if (!response.ok) {
+      lastError = classifyOpenAIResearchError(
+        response.status,
+        payload as OpenAIErrorPayload,
+      );
+
+      if (lastError.retryable && attempt === 0) {
+        await sleep(retryDelayMs(response));
+        continue;
+      }
+
+      throw new Error(lastError.message);
+    }
+
+    const researchPayload = payload as ResearchResponsePayload;
+    const text = outputText(researchPayload);
+    if (!text) throw new Error("Research returned no structured output.");
+
+    return {
+      result: JSON.parse(text) as WebResearchResult,
+      sourceUrls: extractResearchSourceUrls(researchPayload),
+      rawResponse: researchPayload,
+      model,
+    };
   }
 
-  const text = outputText(payload);
-  if (!text) throw new Error("Research returned no structured output.");
-
-  return {
-    result: JSON.parse(text) as WebResearchResult,
-    sourceUrls: extractResearchSourceUrls(payload),
-    rawResponse: payload,
-    model,
-  };
+  throw new Error(
+    lastError?.message ?? "OpenAI API request failed after retry.",
+  );
 }
