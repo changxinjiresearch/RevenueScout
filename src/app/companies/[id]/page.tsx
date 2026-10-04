@@ -65,6 +65,11 @@ type ResearchRun = {
   id: string;
   status: "RUNNING" | "COMPLETED" | "FAILED";
   model: string;
+  sourceUrls: string[];
+  sourceCount: number;
+  structuredResult: unknown;
+  errorMessage: string | null;
+  completedAt: Date | null;
 };
 
 function triageText(status: string) {
