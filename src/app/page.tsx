@@ -98,28 +98,30 @@ export default async function Home() {
       WHERE o.organization_id = ${user.organizationId}
     `;
 
-    items = demoOpportunities
-      .map((demo) => {
-        const configured = configureOpportunity(
-          demo,
-          demo.facts,
-          icps,
-          offerings,
-          links,
-        );
-        if (!configured) return null;
+    const configuredItems: TodayItem[] = [];
 
-        const opportunity = configured.opportunity;
-        return {
-          ...opportunity,
-          assessment: assessOpportunity(opportunity),
-          matchedIcpName: configured.matchedIcp.icpName,
-          offeringReason: configured.offeringReason,
-          dealValueBasis: configured.dealValueBasis,
-        };
-      })
-      .filter((item): item is TodayItem => item !== null);
+    for (const demo of demoOpportunities) {
+      const configured = configureOpportunity(
+        demo,
+        demo.facts,
+        icps,
+        offerings,
+        links,
+      );
 
+      if (!configured) continue;
+
+      const opportunity = configured.opportunity;
+      configuredItems.push({
+        ...opportunity,
+        assessment: assessOpportunity(opportunity),
+        matchedIcpName: configured.matchedIcp.icpName,
+        offeringReason: configured.offeringReason,
+        dealValueBasis: configured.dealValueBasis,
+      });
+    }
+
+    items = configuredItems;
     configVersion = user.configVersion;
   } else {
     items = demoOpportunities.map(({ facts: _facts, ...opportunity }) => ({
