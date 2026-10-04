@@ -1,4 +1,5 @@
-import Link from "next/link";\nimport { demoOpportunities } from "@/data/demo-opportunities";
+import Link from "next/link";
+import { demoOpportunities } from "@/data/demo-opportunities";
 import { assessOpportunity } from "@/lib/domain/opportunity-score";
 
 function money(value: number): string {
