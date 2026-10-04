@@ -149,11 +149,19 @@ export async function searchGleif(
     .map(mapGleifRecord)
     .filter((candidate): candidate is DiscoveryCandidate => candidate !== null);
 
-  if (!country) return candidates;
+  const region = query.region?.trim().toLowerCase();
 
-  return candidates.filter(
-    (candidate) => candidate.country?.toUpperCase() === country,
-  );
+  return candidates.filter((candidate) => {
+    const countryMatches =
+      !country || candidate.country?.toUpperCase() === country;
+    const regionMatches =
+      !region ||
+      candidate.state?.toLowerCase() === region ||
+      candidate.state?.toLowerCase().includes(region) ||
+      candidate.city?.toLowerCase().includes(region);
+
+    return countryMatches && regionMatches;
+  });
 }
 
 export const gleifProvider: DiscoveryProvider = {
