@@ -1,6 +1,11 @@
+import type { CandidateCompanyFacts } from "@/lib/domain/configured-opportunity";
 import type { OpportunityInput } from "@/lib/domain/types";
 
-export const demoOpportunities: OpportunityInput[] = [
+export type DemoOpportunity = OpportunityInput & {
+  facts: CandidateCompanyFacts;
+};
+
+export const demoOpportunities: DemoOpportunity[] = [
   {
     id: "opp-abc-logistics",
     companyName: "ABC Logistics",
@@ -46,6 +51,29 @@ export const demoOpportunities: OpportunityInput[] = [
         verificationStatus: "LIKELY",
       },
     ],
+    facts: {
+      country: "Australia",
+      state: "NSW",
+      city: "Sydney",
+      industry: "Logistics",
+      subindustry: "Freight",
+      employeeCount: 105,
+      companyAgeYears: 11,
+      companyType: "Private",
+      serviceRegions: ["NSW", "VIC"],
+      fastGrowth: true,
+      multiLocation: true,
+      hiring: true,
+      recentFunding: false,
+      roles: ["COO", "Head of Operations"],
+      businessModels: ["B2B", "multi-site"],
+      technologies: ["Xero"],
+      digitalNeed: true,
+      entityType: "PRIVATE",
+      existingCustomer: false,
+      rejected: false,
+      unsubscribed: false,
+    },
   },
   {
     id: "opp-harbour-health",
@@ -92,6 +120,29 @@ export const demoOpportunities: OpportunityInput[] = [
         verificationStatus: "LIKELY",
       },
     ],
+    facts: {
+      country: "Australia",
+      state: "VIC",
+      city: "Melbourne",
+      industry: "Healthcare",
+      subindustry: "Clinics",
+      employeeCount: 42,
+      companyAgeYears: 6,
+      companyType: "Private",
+      serviceRegions: ["VIC"],
+      fastGrowth: true,
+      multiLocation: true,
+      hiring: true,
+      recentFunding: false,
+      roles: ["COO", "Practice Manager"],
+      businessModels: ["B2C", "multi-site"],
+      technologies: ["MYOB"],
+      digitalNeed: true,
+      entityType: "PRIVATE",
+      existingCustomer: false,
+      rejected: false,
+      unsubscribed: false,
+    },
   },
   {
     id: "opp-northstar-build",
@@ -128,5 +179,28 @@ export const demoOpportunities: OpportunityInput[] = [
         verificationStatus: "LIKELY",
       },
     ],
+    facts: {
+      country: "Australia",
+      state: "QLD",
+      city: "Brisbane",
+      industry: "Construction",
+      subindustry: "Commercial Construction",
+      employeeCount: 165,
+      companyAgeYears: 14,
+      companyType: "Private",
+      serviceRegions: ["QLD", "NSW"],
+      fastGrowth: false,
+      multiLocation: true,
+      hiring: false,
+      recentFunding: false,
+      roles: ["Operations Director", "CFO"],
+      businessModels: ["B2B", "project-based"],
+      technologies: ["Xero"],
+      digitalNeed: true,
+      entityType: "PRIVATE",
+      existingCustomer: false,
+      rejected: false,
+      unsubscribed: false,
+    },
   },
 ];
