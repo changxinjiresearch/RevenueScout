@@ -21,7 +21,7 @@ Exit gate: passed.
 
 ## M1 — Workspace, Offering and ICP
 
-Status: **implementation complete; pending final production verification**
+Status: **completed**
 
 ### M1-A — Account and persistence
 
