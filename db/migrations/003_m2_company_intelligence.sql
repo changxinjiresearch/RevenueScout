@@ -144,3 +144,18 @@ CREATE TABLE IF NOT EXISTS discovery_runs (
 
 CREATE INDEX IF NOT EXISTS discovery_runs_org_idx
   ON discovery_runs(organization_id, created_at DESC);
+
+
+CREATE TABLE IF NOT EXISTS discovery_imports (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  discovery_run_id UUID NOT NULL REFERENCES discovery_runs(id) ON DELETE CASCADE,
+  company_id UUID NOT NULL REFERENCES companies(id) ON DELETE CASCADE,
+  candidate_index INTEGER NOT NULL CHECK (candidate_index >= 0),
+  duplicate_detected BOOLEAN NOT NULL DEFAULT FALSE,
+  duplicate_reason TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (discovery_run_id, candidate_index)
+);
+
+CREATE INDEX IF NOT EXISTS discovery_imports_company_idx
+  ON discovery_imports(company_id);
