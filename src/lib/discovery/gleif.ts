@@ -190,6 +190,35 @@ export async function searchGleif(
   });
 }
 
+
+export async function getGleifCandidateByLei(
+  lei: string,
+): Promise<DiscoveryCandidate | null> {
+  const trimmed = lei.trim().toUpperCase();
+  if (!/^[A-Z0-9]{20}$/.test(trimmed)) return null;
+
+  const response = await fetch(
+    `${GLEIF_API}/lei-records/${encodeURIComponent(trimmed)}`,
+    {
+      headers: {
+        Accept: "application/vnd.api+json",
+        "User-Agent":
+          "RevenueScout/0.2 (+https://revenuescout-web-production.up.railway.app)",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`GLEIF lookup failed with HTTP ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as { data?: GleifRecord };
+  return payload.data ? mapGleifRecord(payload.data) : null;
+}
+
 export const gleifProvider: DiscoveryProvider = {
   id: "GLEIF",
   label: "GLEIF Legal Entity Identifier data",
