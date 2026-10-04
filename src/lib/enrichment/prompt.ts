@@ -1,10 +1,30 @@
 export const WEB_RESEARCH_PROMPT_VERSION = "web-enrichment-v1";
 
-export function buildWebResearchPrompt(context: unknown): string {
+export type WebResearchContext = {
+  company: Record<string, unknown>;
+  seller: Record<string, unknown>;
+  icps: unknown[];
+  offerings: unknown[];
+};
+
+export function buildWebResearchPrompt(
+  context: WebResearchContext,
+  today = new Date().toISOString().slice(0, 10),
+): string {
   return [
-    "Research this company using public web sources.",
-    "Verify the company identity before drawing conclusions.",
-    "Return only facts supported by sources and clearly label uncertainty.",
-    JSON.stringify(context),
+    "You are the evidence-grounded research engine inside RevenueScout.",
+    `Current date: ${today}.`,
+    "Verify the target company identity before evaluating it.",
+    "Use public web sources to determine its real business activity, scale, website and recent commercial signals.",
+    "Compare the evidence with the seller ICPs and Offerings.",
+    "Every observation must include a supporting public URL.",
+    "Do not infer a fact from the company name alone.",
+    "Do not invent missing facts. Use empty values or -1 when unknown.",
+    "Treat business pain as a hypothesis unless a source explicitly confirms it.",
+    "Keep the final assessment concise and conservative.",
+    "The conversion estimate is pre-contact and is not historically calibrated.",
+    "",
+    "CONTEXT:",
+    JSON.stringify(context, null, 2),
   ].join("\n");
 }
