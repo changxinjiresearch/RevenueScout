@@ -2,13 +2,29 @@ import { createHash } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
-import { runCompanyEnrichment, sourceWasRetrieved } from "@/lib/enrichment/responses-client";
-import { WEB_RESEARCH_PROMPT_VERSION } from "@/lib/enrichment/prompt";
+import type {
+  IcpRule,
+  OfferingConfig,
+} from "@/lib/domain/configured-opportunity";
+import {
+  runRevenueScoutIntelligenceV1,
+  sourceBelongsToRun,
+  type IntelligenceCompanyInput,
+} from "@/lib/intelligence/engine";
 import { publicUrl } from "@/lib/http/public-url";
 
 function observedDate(value: string): Date {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? new Date() : parsed;
+}
+
+function employeeMidpoint(
+  low: number,
+  high: number,
+  confidence: number,
+): number | null {
+  if (low < 0 || high < low || confidence < 0.75) return null;
+  return Math.round((low + high) / 2);
 }
 
 export async function POST(
@@ -19,18 +35,24 @@ export async function POST(
   const { id } = await context.params;
   const sql = db();
 
-  const [company] = await sql<Record<string, unknown>[]>`
+  const [company] = await sql<IntelligenceCompanyInput[]>`
     SELECT
-      c.id,
       c.display_name AS "displayName",
       c.legal_name AS "legalName",
-      c.website, c.domain, c.country, c.state, c.city, c.address,
-      c.legal_entity_category AS "legalEntityCategory",
-      c.entity_status AS "entityStatus",
-      (SELECT ci.identifier_value FROM company_identifiers ci
-       WHERE ci.company_id = c.id AND ci.identifier_type = 'LEI' LIMIT 1) AS lei
+      c.website,
+      c.domain,
+      c.country,
+      c.state,
+      c.city,
+      c.industry,
+      c.subindustry,
+      c.employee_count AS "employeeCount",
+      c.company_type AS "companyType",
+      c.service_regions AS "serviceRegions",
+      c.entity_type AS "entityType"
     FROM companies c
-    WHERE c.id = ${id} AND c.organization_id = ${user.organizationId}
+    WHERE c.id = ${id}
+      AND c.organization_id = ${user.organizationId}
     LIMIT 1
   `;
 
@@ -38,77 +60,129 @@ export async function POST(
     return NextResponse.json({ error: "Company not found." }, { status: 404 });
   }
 
-  const [seller] = await sql<Record<string, unknown>[]>`
-    SELECT name, website, country, industry, company_size AS "companySize",
-           description, service_regions AS "serviceRegions"
-    FROM organizations
-    WHERE id = ${user.organizationId}
-    LIMIT 1
-  `;
-
-  const [icps, offerings] = await Promise.all([
-    sql`
-      SELECT name, countries, states, cities, industries, subindustries,
-             employee_min AS "employeeMin", employee_max AS "employeeMax",
-             company_types AS "companyTypes", service_regions AS "serviceRegions",
-             fast_growth AS "fastGrowth", multi_location AS "multiLocation",
-             hiring, recent_funding AS "recentFunding",
-             required_roles AS "requiredRoles", business_models AS "businessModels",
-             technologies, digital_need AS "digitalNeed", exclusions
+  const [icps, offerings, evidenceUrls] = await Promise.all([
+    sql<IcpRule[]>`
+      SELECT
+        id,
+        name,
+        countries,
+        states,
+        cities,
+        industries,
+        subindustries,
+        employee_min AS "employeeMin",
+        employee_max AS "employeeMax",
+        company_age_min AS "companyAgeMin",
+        company_age_max AS "companyAgeMax",
+        company_types AS "companyTypes",
+        service_regions AS "serviceRegions",
+        fast_growth AS "fastGrowth",
+        multi_location AS "multiLocation",
+        hiring,
+        recent_funding AS "recentFunding",
+        required_roles AS "requiredRoles",
+        business_models AS "businessModels",
+        technologies,
+        digital_need AS "digitalNeed",
+        exclusions,
+        excluded_industries AS "excludedIndustries",
+        exclude_government AS "excludeGovernment",
+        exclude_nonprofit AS "excludeNonprofit",
+        exclude_existing_customer AS "excludeExistingCustomer",
+        exclude_rejected AS "excludeRejected",
+        exclude_unsubscribed AS "excludeUnsubscribed",
+        employee_exclude_below AS "employeeExcludeBelow",
+        employee_exclude_above AS "employeeExcludeAbove"
       FROM icps
       WHERE organization_id = ${user.organizationId}
     `,
-    sql`
-      SELECT name, description, primary_problems AS "primaryProblems",
-             typical_customers AS "typicalCustomers",
-             min_contract_value::float8 AS "minContractValue",
-             avg_contract_value::float8 AS "avgContractValue",
-             ideal_contract_value::float8 AS "idealContractValue",
-             sales_cycle_days AS "salesCycleDays",
-             unsuitable_customers AS "unsuitableCustomers"
+    sql<OfferingConfig[]>`
+      SELECT
+        id,
+        name,
+        min_contract_value::float8 AS "minContractValue",
+        avg_contract_value::float8 AS "avgContractValue",
+        ideal_contract_value::float8 AS "idealContractValue"
       FROM offerings
       WHERE organization_id = ${user.organizationId}
     `,
+    sql<{ sourceUrl: string }[]>`
+      SELECT DISTINCT source_url AS "sourceUrl"
+      FROM company_evidence
+      WHERE company_id = ${id}
+        AND organization_id = ${user.organizationId}
+        AND source_url IS NOT NULL
+      ORDER BY source_url
+      LIMIT 20
+    `,
   ]);
 
-  const researchContext = {
+  const runContext = {
     company,
-    seller: seller ?? {},
-    icps: [...icps],
-    offerings: [...offerings],
+    icpIds: icps.map((icp) => icp.id),
+    offeringIds: offerings.map((offering) => offering.id),
+    evidenceSourceCount: evidenceUrls.length,
   };
 
-  const model = process.env.OPENAI_ENRICHMENT_MODEL?.trim() || "gpt-5.6";
   const [run] = await sql<{ id: string }[]>`
     INSERT INTO web_enrichment_runs (
-      organization_id, company_id, status, engine, model,
-      prompt_version, request_context, created_by
+      organization_id,
+      company_id,
+      status,
+      engine,
+      model,
+      prompt_version,
+      request_context,
+      created_by
     )
     VALUES (
-      ${user.organizationId}, ${id}, 'RUNNING', 'RESPONSES_WEB_SEARCH',
-      ${model}, ${WEB_RESEARCH_PROMPT_VERSION},
-      ${JSON.stringify(researchContext)}::text::jsonb, ${user.id}
+      ${user.organizationId},
+      ${id},
+      'RUNNING',
+      'REVENUESCOUT_INTELLIGENCE_V1',
+      'RS_CONVERSION_V1',
+      'deterministic-v1',
+      ${JSON.stringify(runContext)}::text::jsonb,
+      ${user.id}
     )
     RETURNING id
   `;
 
   try {
-    const research = await runCompanyEnrichment(researchContext);
-    const result = research.result;
-    const officialWebsite =
-      result.officialWebsite &&
-      sourceWasRetrieved(result.officialWebsite, research.sourceUrls)
-        ? result.officialWebsite
-        : null;
+    const research = await runRevenueScoutIntelligenceV1({
+      company,
+      evidenceUrls: evidenceUrls.map((item) => item.sourceUrl),
+      icps,
+      offerings,
+    });
 
+    const result = research.result;
     const verified = result.observations.filter(
       (item) =>
         item.confidence >= 0.6 &&
-        sourceWasRetrieved(item.sourceUrl, research.sourceUrls),
+        sourceBelongsToRun(item.sourceUrl, research.sourceUrls),
     );
     const currentVerified = verified.filter(
-      (item) => item.verificationStatus !== "OUTDATED",
+      (item) =>
+        item.verificationStatus === "CONFIRMED" ||
+        item.verificationStatus === "LIKELY",
     );
+
+    const website =
+      research.collector.websiteConfidence >= 0.8 &&
+      result.officialWebsite
+        ? result.officialWebsite
+        : null;
+
+    const employeeCount = employeeMidpoint(
+      result.employeeLow,
+      result.employeeHigh,
+      result.employeeConfidence,
+    );
+    const employeeRange =
+      employeeCount !== null
+        ? `${result.employeeLow}–${result.employeeHigh}`
+        : null;
 
     await sql.begin(async (tx) => {
       for (const observation of verified) {
@@ -144,7 +218,7 @@ export async function POST(
             ${id},
             ${observation.sourceType},
             ${observation.sourceUrl},
-            ${observation.sourceTitle || "Web research"},
+            ${observation.sourceTitle || "RevenueScout public-web collector"},
             ${observation.title},
             ${observation.observation},
             ${observedDate(observation.observedAt)},
@@ -211,48 +285,97 @@ export async function POST(
       await tx`
         UPDATE companies
         SET
-          website = COALESCE(website, NULLIF(${officialWebsite ?? ""}, '')),
-          description = COALESCE(description, NULLIF(${result.businessSummary.trim()}, '')),
+          website = COALESCE(website, NULLIF(${website ?? ""}, '')),
+          domain = COALESCE(
+            domain,
+            ${website ? new URL(website).hostname.replace(/^www\./, "") : null}
+          ),
+          description = COALESCE(
+            description,
+            NULLIF(${result.businessSummary.trim()}, '')
+          ),
           industry = COALESCE(
             industry,
-            CASE WHEN ${result.evidenceConfidence} >= 65
-                 THEN NULLIF(${result.industry.trim()}, '') ELSE NULL END
+            CASE
+              WHEN ${result.industry !== "" && result.evidenceConfidence >= 55}
+              THEN NULLIF(${result.industry}, '')
+              ELSE NULL
+            END
           ),
           subindustry = COALESCE(
             subindustry,
-            CASE WHEN ${result.evidenceConfidence} >= 65
-                 THEN NULLIF(${result.subindustry.trim()}, '') ELSE NULL END
+            CASE
+              WHEN ${result.subindustry !== "" && result.evidenceConfidence >= 55}
+              THEN NULLIF(${result.subindustry}, '')
+              ELSE NULL
+            END
           ),
+          employee_count = COALESCE(employee_count, ${employeeCount}),
+          employee_range = COALESCE(employee_range, ${employeeRange}),
           service_regions = CASE
-            WHEN cardinality(service_regions) = 0 AND cardinality(${result.serviceRegions}) > 0
-            THEN ${result.serviceRegions} ELSE service_regions END,
+            WHEN cardinality(service_regions) = 0
+              AND cardinality(${result.serviceRegions}) > 0
+            THEN ${result.serviceRegions}
+            ELSE service_regions
+          END,
           business_models = CASE
-            WHEN cardinality(business_models) = 0 AND cardinality(${result.businessModels}) > 0
-            THEN ${result.businessModels} ELSE business_models END,
+            WHEN cardinality(business_models) = 0
+              AND cardinality(${result.businessModels}) > 0
+            THEN ${result.businessModels}
+            ELSE business_models
+          END,
           technologies = CASE
-            WHEN cardinality(technologies) = 0 AND cardinality(${result.technologies}) > 0
-            THEN ${result.technologies} ELSE technologies END,
+            WHEN cardinality(technologies) = 0
+              AND cardinality(${result.technologies}) > 0
+            THEN ${result.technologies}
+            ELSE technologies
+          END,
           roles_observed = CASE
-            WHEN cardinality(roles_observed) = 0 AND cardinality(${result.decisionRoles}) > 0
-            THEN ${result.decisionRoles} ELSE roles_observed END,
-          currently_hiring = currently_hiring OR ${currentVerified.some((x) => x.signalType === "HIRING")},
-          fast_growth = fast_growth OR ${currentVerified.some((x) => x.signalType === "GROWTH")},
-          recent_funding = recent_funding OR ${currentVerified.some((x) => x.signalType === "FUNDING")},
-          multi_location = multi_location OR ${result.serviceRegions.length > 1},
-          digital_need = digital_need OR ${currentVerified.some((x) => x.signalType === "TECHNOLOGY" || x.signalType === "OPERATIONAL_PAIN")},
+            WHEN cardinality(roles_observed) = 0
+              AND cardinality(${result.decisionRoles}) > 0
+            THEN ${result.decisionRoles}
+            ELSE roles_observed
+          END,
+          currently_hiring =
+            currently_hiring OR ${currentVerified.some(
+              (item) => item.signalType === "HIRING",
+            )},
+          fast_growth =
+            fast_growth OR ${currentVerified.some(
+              (item) =>
+                item.signalType === "GROWTH" ||
+                item.signalType === "EXPANSION",
+            )},
+          recent_funding =
+            recent_funding OR ${currentVerified.some(
+              (item) => item.signalType === "FUNDING",
+            )},
+          multi_location =
+            multi_location OR ${result.serviceRegions.length > 1},
+          digital_need =
+            digital_need OR ${currentVerified.some(
+              (item) =>
+                item.signalType === "TECHNOLOGY" ||
+                item.signalType === "OPERATIONAL_PAIN",
+            )},
           updated_at = NOW()
-        WHERE id = ${id} AND organization_id = ${user.organizationId}
+        WHERE id = ${id}
+          AND organization_id = ${user.organizationId}
       `;
 
       await tx`
         UPDATE web_enrichment_runs
-        SET status = 'COMPLETED',
-            model = ${research.model},
-            source_urls = ${research.sourceUrls},
-            source_count = ${research.sourceUrls.length},
-            structured_result = ${JSON.stringify(result)}::text::jsonb,
-            raw_response = ${JSON.stringify(research.rawResponse)}::text::jsonb,
-            completed_at = NOW()
+        SET
+          status = 'COMPLETED',
+          engine = ${research.engine},
+          model = ${research.model},
+          source_urls = ${research.sourceUrls},
+          source_count = ${research.sourceUrls.length},
+          structured_result = ${JSON.stringify(result)}::text::jsonb,
+          raw_response = ${JSON.stringify({
+            collector: research.collector,
+          })}::text::jsonb,
+          completed_at = NOW()
         WHERE id = ${run.id}
       `;
     });
@@ -261,12 +384,20 @@ export async function POST(
     url.searchParams.set("research", "complete");
     return NextResponse.redirect(url, 303);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Web research failed.";
+    const message =
+      error instanceof Error
+        ? error.message
+        : "RevenueScout Intelligence Engine failed.";
+
     await sql`
       UPDATE web_enrichment_runs
-      SET status = 'FAILED', error_message = ${message.slice(0, 1000)}, completed_at = NOW()
+      SET
+        status = 'FAILED',
+        error_message = ${message.slice(0, 1000)},
+        completed_at = NOW()
       WHERE id = ${run.id}
     `;
+
     const url = publicUrl(request, `/companies/${id}`);
     url.searchParams.set("research_error", "failed");
     return NextResponse.redirect(url, 303);

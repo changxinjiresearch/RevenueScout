@@ -278,6 +278,7 @@ export default async function CompanyIntelligencePage({
     FROM web_enrichment_runs
     WHERE company_id = ${id}
       AND organization_id = ${user.organizationId}
+      AND engine = 'REVENUESCOUT_INTELLIGENCE_V1'
     ORDER BY created_at DESC
     LIMIT 1
   `;
@@ -356,51 +357,48 @@ export default async function CompanyIntelligencePage({
       {query.error ? <div className="error-banner">{query.error}</div> : null}
       {query.research ? (
         <div className="success-banner">
-          Automatic web research completed and the company was reassessed.
+          RevenueScout Intelligence Engine completed the analysis and reassessed the company.
         </div>
       ) : null}
       {query.research_error ? (
         <div className="error-banner">
-          Automatic web research failed. Open the research card below for the
-          latest status.
+          RevenueScout Intelligence Engine failed. Open the analysis card below for the latest status.
         </div>
       ) : null}
 
       <section className="ai-research-card">
         <div className="ai-research-heading">
           <div>
-            <div className="eyebrow">Automatic web enrichment</div>
-            <h2>AI company research</h2>
+            <div className="eyebrow">RevenueScout Intelligence Engine</div>
+            <h2>Zero-cost company analysis</h2>
             <p>
-              RevenueScout searches public sources for the company website,
-              business activity, size evidence, hiring, expansion and other
-              buying signals, then compares them with your ICP and Offering.
+              RevenueScout collects public company pages, extracts company facts and buying signals, then scores them with the built-in RS Conversion Model v1. No paid AI API is used.
             </p>
           </div>
           <form action={`/api/companies/${id}/research`} method="post">
             <button className="primary-button" type="submit">
               {researchRun?.status === "COMPLETED"
-                ? "Refresh research"
-                : "Research company"}
+                ? "Re-run analysis"
+                : "Analyze company"}
             </button>
           </form>
         </div>
 
         {!researchRun ? (
           <div className="ai-research-empty">
-            No automatic web research has been run yet.
+            No RevenueScout Intelligence Engine analysis has been run yet.
           </div>
         ) : null}
 
         {researchRun?.status === "RUNNING" ? (
           <div className="ai-research-empty">
-            Research is running. Reload this page shortly.
+            Analysis is running. Reload this page shortly.
           </div>
         ) : null}
 
         {researchRun?.status === "FAILED" ? (
           <div className="error-banner">
-            Research failed: {researchRun.errorMessage ?? "Unknown error"}
+            Analysis failed: {researchRun.errorMessage ?? "Unknown error"}
           </div>
         ) : null}
 
@@ -415,7 +413,7 @@ export default async function CompanyIntelligencePage({
                 </strong>
               </div>
               <div>
-                <span>Estimated paid-customer likelihood</span>
+                <span>Estimated conversion likelihood</span>
                 <strong>
                   {researchRun.structuredResult.estimatedConversionPercent}%
                 </strong>
@@ -437,8 +435,7 @@ export default async function CompanyIntelligencePage({
                 {researchRun.structuredResult.assessmentSummary}
               </strong>
               <p>
-                Pre-contact estimate only. It is not yet calibrated against
-                historical Won/Lost outcomes.
+                Pre-contact estimate from RS Conversion Model v1. It is deterministic and not yet calibrated against historical Won/Lost outcomes.
               </p>
             </div>
 
