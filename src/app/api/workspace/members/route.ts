@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import {
@@ -31,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   if (!target) {
     return NextResponse.redirect(
-      new URL("/workspace?error=Member+not+found", request.url),
+      publicUrl(request, "/workspace?error=Member+not+found"),
       303,
     );
   }
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.redirect(
-      new URL("/workspace?saved=member-removed", request.url),
+      publicUrl(request, "/workspace?saved=member-removed"),
       303,
     );
   }
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
   const nextRole = String(formData.get("role") ?? "") as WorkspaceRole;
   if (!VALID_ROLES.has(nextRole)) {
     return NextResponse.redirect(
-      new URL("/workspace?error=Invalid+role", request.url),
+      publicUrl(request, "/workspace?error=Invalid+role"),
       303,
     );
   }
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
   `;
 
   return NextResponse.redirect(
-    new URL("/workspace?saved=member-role", request.url),
+    publicUrl(request, "/workspace?saved=member-role"),
     303,
   );
 }
