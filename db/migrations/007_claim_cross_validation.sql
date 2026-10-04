@@ -59,3 +59,22 @@ CREATE TABLE IF NOT EXISTS company_claim_evidence (
 
 CREATE INDEX IF NOT EXISTS company_claim_evidence_evidence_idx
   ON company_claim_evidence(evidence_id);
+
+
+ALTER TABLE web_enrichment_runs
+  ADD COLUMN IF NOT EXISTS potential_score INTEGER,
+  ADD COLUMN IF NOT EXISTS confidence_score INTEGER,
+  ADD COLUMN IF NOT EXISTS conservative_score INTEGER,
+  ADD COLUMN IF NOT EXISTS upside_score INTEGER,
+  ADD COLUMN IF NOT EXISTS sales_priority_score INTEGER,
+  ADD COLUMN IF NOT EXISTS research_priority_score INTEGER,
+  ADD COLUMN IF NOT EXISTS value_of_information_score INTEGER,
+  ADD COLUMN IF NOT EXISTS priority_action TEXT;
+
+CREATE INDEX IF NOT EXISTS web_enrichment_runs_priority_idx
+  ON web_enrichment_runs(
+    organization_id,
+    status,
+    sales_priority_score DESC,
+    research_priority_score DESC
+  );
