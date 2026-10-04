@@ -100,6 +100,51 @@ describe("ICP and Offering configuration", () => {
     expect(result.score).toBe(0);
   });
 
+  it("fails qualification when a configured core ICP boundary is missed", () => {
+    const result = evaluateIcp(
+      {
+        ...company,
+        industry: "Healthcare",
+        fastGrowth: true,
+        multiLocation: true,
+        hiring: true,
+        digitalNeed: true,
+      },
+      icp,
+    );
+
+    expect(result.qualified).toBe(false);
+    expect(result.score).toBe(0);
+    expect(result.qualificationFailures).toContain(
+      "Industry does not match target industries",
+    );
+  });
+
+  it("does not let strong soft signals rescue an unqualified company", () => {
+    const configured = configureOpportunity(
+      base,
+      {
+        ...company,
+        industry: "Healthcare",
+        fastGrowth: true,
+        multiLocation: true,
+        hiring: true,
+        digitalNeed: true,
+      },
+      [icp],
+      [{
+        id: "offering-1",
+        name: "Workflow Automation",
+        minContractValue: 15000,
+        avgContractValue: 30000,
+        idealContractValue: 50000,
+      }],
+      [{ offeringId: "offering-1", icpId: "icp-1" }],
+    );
+
+    expect(configured).toBeNull();
+  });
+
   it("uses linked Offering economics instead of demo deal value", () => {
     const configured = configureOpportunity(
       base,
