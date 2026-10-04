@@ -25,6 +25,9 @@ import {
   evidenceAgeDays,
   evidenceFreshness,
 } from "@/lib/evidence/freshness";
+import type { WebResearchResult } from "@/lib/enrichment/result-types";
+import { weightedCommercialScore } from "@/lib/enrichment/score";
+import { preContactLikelihood } from "@/lib/enrichment/likelihood";
 
 export const dynamic = "force-dynamic";
 
