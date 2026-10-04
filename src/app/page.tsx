@@ -20,12 +20,42 @@ import { getOnboardingState } from "@/lib/onboarding";
 
 export const dynamic = "force-dynamic";
 
+type PriorityRun = {
+  companyId: string;
+  potentialScore: number | null;
+  confidenceScore: number | null;
+  conservativeScore: number | null;
+  upsideScore: number | null;
+  salesPriorityScore: number | null;
+  researchPriorityScore: number | null;
+  valueOfInformationScore: number | null;
+  priorityAction: string | null;
+};
+
 type TodayItem = OpportunityInput & {
   assessment: ReturnType<typeof assessOpportunity>;
   matchedIcpName: string | null;
   offeringReason: string | null;
   dealValueBasis: string | null;
   companyHref: string | null;
+  salesPriorityScore: number | null;
+  researchPriorityScore: number | null;
+  potentialScore: number | null;
+  confidenceScore: number | null;
+  priorityAction: string | null;
+};
+
+type ResearchQueueItem = {
+  companyId: string;
+  companyName: string;
+  location: string;
+  potentialScore: number;
+  confidenceScore: number;
+  conservativeScore: number;
+  upsideScore: number;
+  researchPriorityScore: number;
+  valueOfInformationScore: number;
+  priorityAction: string;
 };
 
 function money(value: number): string {
@@ -41,6 +71,7 @@ export default async function Home() {
   let items: TodayItem[] = [];
   let configVersion: number | null = null;
   let storedCompanyCount = 0;
+  let researchQueue: ResearchQueueItem[] = [];
 
   if (user) {
     const onboarding = await getOnboardingState(user.organizationId);
@@ -49,7 +80,7 @@ export default async function Home() {
     }
 
     const sql = db();
-    const [icps, offerings, links, companies, evidence, signals] =
+    const [icps, offerings, links, companies, evidence, signals, priorityRuns] =
       await Promise.all([
         sql<IcpRule[]>`
           SELECT
@@ -164,6 +195,23 @@ export default async function Home() {
           FROM buying_signals s
           JOIN company_evidence e ON e.id = s.evidence_id
           WHERE s.organization_id = ${user.organizationId}
+        `,
+        sql<PriorityRun[]>`
+          SELECT DISTINCT ON (company_id)
+            company_id AS "companyId",
+            potential_score AS "potentialScore",
+            confidence_score AS "confidenceScore",
+            conservative_score AS "conservativeScore",
+            upside_score AS "upsideScore",
+            sales_priority_score AS "salesPriorityScore",
+            research_priority_score AS "researchPriorityScore",
+            value_of_information_score AS "valueOfInformationScore",
+            priority_action AS "priorityAction"
+          FROM web_enrichment_runs
+          WHERE organization_id = ${user.organizationId}
+            AND status = 'COMPLETED'
+            AND engine = 'REVENUESCOUT_INTELLIGENCE_V2'
+          ORDER BY company_id, created_at DESC
         `,
       ]);
 
