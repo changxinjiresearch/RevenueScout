@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { db } from "@/lib/db";
 import { hashPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
@@ -12,7 +13,7 @@ function redirectWithError(
   message: string,
   inviteToken?: string,
 ) {
-  const url = new URL("/register", request.url);
+  const url = publicUrl(request, "/register");
   url.searchParams.set("error", message);
   if (inviteToken) url.searchParams.set("invite", inviteToken);
   return NextResponse.redirect(url, 303);
@@ -109,7 +110,7 @@ export async function POST(request: NextRequest) {
 
   await createSession(userId);
   return NextResponse.redirect(
-    new URL(invitation ? "/" : "/onboarding", request.url),
+    publicUrl(request, invitation ? "/" : "/onboarding"),
     303,
   );
 }

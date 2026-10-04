@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { canManageWorkspace } from "@/lib/permissions";
@@ -34,7 +35,7 @@ export async function POST(request: NextRequest) {
   const description = String(formData.get("description") ?? "").trim();
 
   if (!name) {
-    const url = new URL(target, request.url);
+    const url = publicUrl(request, target);
     url.searchParams.set("error", "Company name is required.");
     return NextResponse.redirect(url, 303);
   }
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
       serviceRegions.length === 0 ||
       !description)
   ) {
-    const url = new URL("/onboarding", request.url);
+    const url = publicUrl(request, "/onboarding");
     url.searchParams.set(
       "error",
       "Country, service region, industry, company size and description are required to finish this step.",
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
     WHERE id = ${user.organizationId}
   `;
 
-  const url = new URL(target, request.url);
+  const url = publicUrl(request, target);
   url.searchParams.set("saved", "workspace");
   return NextResponse.redirect(url, 303);
 }

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
@@ -13,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   const state = await getOnboardingState(user.organizationId);
   if (!state.complete) {
-    const url = new URL("/onboarding", request.url);
+    const url = publicUrl(request, "/onboarding");
     url.searchParams.set("error", "Complete all four setup steps first.");
     return NextResponse.redirect(url, 303);
   }
@@ -25,5 +26,5 @@ export async function POST(request: NextRequest) {
     WHERE id = ${user.organizationId}
   `;
 
-  return NextResponse.redirect(new URL("/", request.url), 303);
+  return NextResponse.redirect(publicUrl(request, "/"), 303);
 }

@@ -1,5 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import { hashInvitationToken } from "@/lib/auth/invitations";
 import { db } from "@/lib/db";
@@ -15,7 +16,7 @@ export async function POST(request: NextRequest) {
 
   if (!email.includes("@") || !VALID_ROLES.has(role)) {
     return NextResponse.redirect(
-      new URL("/workspace?error=Enter+a+valid+email+and+role", request.url),
+      publicUrl(request, "/workspace?error=Enter+a+valid+email+and+role"),
       303,
     );
   }
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
     )
   `;
 
-  const url = new URL("/workspace", request.url);
+  const url = publicUrl(request, "/workspace");
   url.searchParams.set("invite", token);
   return NextResponse.redirect(url, 303);
 }

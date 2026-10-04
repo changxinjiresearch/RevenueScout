@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { canManageGtm } from "@/lib/permissions";
@@ -29,7 +30,7 @@ function returnTo(formData: FormData): string {
 }
 
 function errorRedirect(request: NextRequest, path: string, message: string) {
-  const url = new URL(path, request.url);
+  const url = publicUrl(request, path);
   url.searchParams.set("error", message);
   return NextResponse.redirect(url, 303);
 }
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
       `;
     });
 
-    const url = new URL(target, request.url);
+    const url = publicUrl(request, target);
     url.searchParams.set("saved", "icp-deleted");
     return NextResponse.redirect(url, 303);
   }
@@ -259,7 +260,7 @@ export async function POST(request: NextRequest) {
     `;
   });
 
-  const url = new URL(target, request.url);
+  const url = publicUrl(request, target);
   url.searchParams.set("saved", "icp");
   return NextResponse.redirect(url, 303);
 }

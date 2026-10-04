@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { db } from "@/lib/db";
 import { verifyPassword } from "@/lib/auth/password";
 import { createSession } from "@/lib/auth/session";
 
 function invalidLogin(request: NextRequest) {
-  const url = new URL("/login", request.url);
+  const url = publicUrl(request, "/login");
   url.searchParams.set("error", "Invalid email or password.");
   return NextResponse.redirect(url, 303);
 }
@@ -27,5 +28,5 @@ export async function POST(request: NextRequest) {
   }
 
   await createSession(user.id);
-  return NextResponse.redirect(new URL("/onboarding", request.url), 303);
+  return NextResponse.redirect(publicUrl(request, "/onboarding"), 303);
 }

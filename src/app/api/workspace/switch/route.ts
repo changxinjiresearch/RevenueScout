@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 
@@ -26,5 +27,5 @@ export async function POST(request: NextRequest) {
     WHERE id = ${user.id}
   `;
 
-  return NextResponse.redirect(new URL("/onboarding", request.url), 303);
+  return NextResponse.redirect(publicUrl(request, "/onboarding"), 303);
 }
