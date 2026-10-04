@@ -610,6 +610,26 @@ export default async function CompanyIntelligencePage({
               <strong>{researchRun.structuredResult.nextAction}</strong>
             </div>
 
+            {researchRun.structuredResult.researchTargets.length > 0 ? (
+              <section className="research-targets-panel">
+                <div className="field-label">Highest-value evidence to collect next</div>
+                <div className="research-target-list">
+                  {researchRun.structuredResult.researchTargets
+                    .slice(0, 5)
+                    .map((target) => (
+                      <div className="research-target-item" key={target.target}>
+                        <div>
+                          <strong>{target.target}</strong>
+                          <span>{target.status.replaceAll("_", " ")}</span>
+                        </div>
+                        <p>{target.reason}</p>
+                        <b>VOI {target.valueScore}/100</b>
+                      </div>
+                    ))}
+                </div>
+              </section>
+            ) : null}
+
             <details className="claim-validation-details" open>
               <summary>
                 Cross-validated claims (
