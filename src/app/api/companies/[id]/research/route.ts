@@ -102,7 +102,12 @@ export async function POST(
         : null;
 
     const verified = result.observations.filter(
-      (item) => item.confidence >= 0.6 && sourceWasRetrieved(item.sourceUrl, research.sourceUrls),
+      (item) =>
+        item.confidence >= 0.6 &&
+        sourceWasRetrieved(item.sourceUrl, research.sourceUrls),
+    );
+    const currentVerified = verified.filter(
+      (item) => item.verificationStatus !== "OUTDATED",
     );
 
     await sql.begin(async (tx) => {
@@ -230,11 +235,11 @@ export async function POST(
           roles_observed = CASE
             WHEN cardinality(roles_observed) = 0 AND cardinality(${result.decisionRoles}) > 0
             THEN ${result.decisionRoles} ELSE roles_observed END,
-          currently_hiring = currently_hiring OR ${verified.some((x) => x.signalType === "HIRING")},
-          fast_growth = fast_growth OR ${verified.some((x) => x.signalType === "GROWTH")},
-          recent_funding = recent_funding OR ${verified.some((x) => x.signalType === "FUNDING")},
+          currently_hiring = currently_hiring OR ${currentVerified.some((x) => x.signalType === "HIRING")},
+          fast_growth = fast_growth OR ${currentVerified.some((x) => x.signalType === "GROWTH")},
+          recent_funding = recent_funding OR ${currentVerified.some((x) => x.signalType === "FUNDING")},
           multi_location = multi_location OR ${result.serviceRegions.length > 1},
-          digital_need = digital_need OR ${verified.some((x) => x.signalType === "TECHNOLOGY" || x.signalType === "OPERATIONAL_PAIN")},
+          digital_need = digital_need OR ${currentVerified.some((x) => x.signalType === "TECHNOLOGY" || x.signalType === "OPERATIONAL_PAIN")},
           updated_at = NOW()
         WHERE id = ${id} AND organization_id = ${user.organizationId}
       `;
