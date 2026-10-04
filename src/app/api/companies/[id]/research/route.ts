@@ -184,6 +184,11 @@ export async function POST(
         ? `${result.employeeLow}–${result.employeeHigh}`
         : null;
 
+    const hasServiceRegions = result.serviceRegions.length > 0;
+    const hasBusinessModels = result.businessModels.length > 0;
+    const hasTechnologies = result.technologies.length > 0;
+    const hasDecisionRoles = result.decisionRoles.length > 0;
+
     await sql.begin(async (tx) => {
       for (const observation of verified) {
         const contentHash = createHash("sha256")
@@ -314,26 +319,26 @@ export async function POST(
           employee_range = COALESCE(employee_range, ${employeeRange}),
           service_regions = CASE
             WHEN cardinality(service_regions) = 0
-              AND cardinality(${result.serviceRegions}) > 0
-            THEN ${result.serviceRegions}
+              AND ${hasServiceRegions}
+            THEN ${result.serviceRegions}::text[]
             ELSE service_regions
           END,
           business_models = CASE
             WHEN cardinality(business_models) = 0
-              AND cardinality(${result.businessModels}) > 0
-            THEN ${result.businessModels}
+              AND ${hasBusinessModels}
+            THEN ${result.businessModels}::text[]
             ELSE business_models
           END,
           technologies = CASE
             WHEN cardinality(technologies) = 0
-              AND cardinality(${result.technologies}) > 0
-            THEN ${result.technologies}
+              AND ${hasTechnologies}
+            THEN ${result.technologies}::text[]
             ELSE technologies
           END,
           roles_observed = CASE
             WHEN cardinality(roles_observed) = 0
-              AND cardinality(${result.decisionRoles}) > 0
-            THEN ${result.decisionRoles}
+              AND ${hasDecisionRoles}
+            THEN ${result.decisionRoles}::text[]
             ELSE roles_observed
           END,
           currently_hiring =
@@ -369,7 +374,7 @@ export async function POST(
           status = 'COMPLETED',
           engine = ${research.engine},
           model = ${research.model},
-          source_urls = ${research.sourceUrls},
+          source_urls = ${research.sourceUrls}::text[],
           source_count = ${research.sourceUrls.length},
           structured_result = ${JSON.stringify(result)}::text::jsonb,
           raw_response = ${JSON.stringify({
