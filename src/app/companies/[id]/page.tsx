@@ -94,7 +94,7 @@ export default async function CompanyIntelligencePage({
   const query = await searchParams;
   const sql = db();
 
-  const [company] = await sql<CompanyView[]>\`
+  const [company] = await sql<CompanyView[]>`
     SELECT
       id,
       display_name AS "displayName",
@@ -141,13 +141,13 @@ export default async function CompanyIntelligencePage({
     WHERE id = ${id}
       AND organization_id = ${user.organizationId}
     LIMIT 1
-  \`;
+  `;
 
   if (!company) notFound();
 
   const [evidence, signals, identifiers, icps, offerings, links] =
     await Promise.all([
-      sql<EvidenceView[]>\`
+      sql<EvidenceView[]>`
         SELECT
           id,
           company_id AS "companyId",
@@ -166,8 +166,8 @@ export default async function CompanyIntelligencePage({
         WHERE company_id = ${id}
           AND organization_id = ${user.organizationId}
         ORDER BY observed_at DESC, created_at DESC
-      \`,
-      sql<SignalView[]>\`
+      `,
+      sql<SignalView[]>`
         SELECT
           s.id,
           s.company_id AS "companyId",
@@ -188,8 +188,8 @@ export default async function CompanyIntelligencePage({
         WHERE s.company_id = ${id}
           AND s.organization_id = ${user.organizationId}
         ORDER BY s.observed_at DESC, s.created_at DESC
-      \`,
-      sql<Identifier[]>\`
+      `,
+      sql<Identifier[]>`
         SELECT
           identifier_type AS "identifierType",
           identifier_value AS "identifierValue",
@@ -197,8 +197,8 @@ export default async function CompanyIntelligencePage({
         FROM company_identifiers
         WHERE company_id = ${id}
         ORDER BY identifier_type
-      \`,
-      sql<IcpRule[]>\`
+      `,
+      sql<IcpRule[]>`
         SELECT
           id,
           name,
@@ -232,8 +232,8 @@ export default async function CompanyIntelligencePage({
           employee_exclude_above AS "employeeExcludeAbove"
         FROM icps
         WHERE organization_id = ${user.organizationId}
-      \`,
-      sql<OfferingConfig[]>\`
+      `,
+      sql<OfferingConfig[]>`
         SELECT
           id,
           name,
@@ -242,15 +242,15 @@ export default async function CompanyIntelligencePage({
           ideal_contract_value::float8 AS "idealContractValue"
         FROM offerings
         WHERE organization_id = ${user.organizationId}
-      \`,
-      sql<OfferingIcpLink[]>\`
+      `,
+      sql<OfferingIcpLink[]>`
         SELECT
           oi.offering_id AS "offeringId",
           oi.icp_id AS "icpId"
         FROM offering_icps oi
         JOIN offerings o ON o.id = oi.offering_id
         WHERE o.organization_id = ${user.organizationId}
-      \`,
+      `,
     ]);
 
   const configured = buildConfiguredOpportunityFromCompany({
