@@ -22,13 +22,13 @@ CREATE TABLE IF NOT EXISTS company_research_runs (
   researched_roles TEXT[] NOT NULL DEFAULT '{}',
   commercial_fit_score INTEGER CHECK (commercial_fit_score BETWEEN 0 AND 100),
   buying_intent_score INTEGER CHECK (buying_intent_score BETWEEN 0 AND 100),
-  ability_to_pay_score INTEGER CHECK (ability_to_pay_score BETWEEN 0 AND 100),
+  budget_fit_score INTEGER CHECK (budget_fit_score BETWEEN 0 AND 100),
   timing_score INTEGER CHECK (timing_score BETWEEN 0 AND 100),
   need_score INTEGER CHECK (need_score BETWEEN 0 AND 100),
   evidence_confidence INTEGER CHECK (evidence_confidence BETWEEN 0 AND 100),
   potential_score INTEGER CHECK (potential_score BETWEEN 0 AND 100),
-  paid_customer_probability NUMERIC(5,4)
-    CHECK (paid_customer_probability >= 0 AND paid_customer_probability <= 1),
+  conversion_likelihood NUMERIC(5,4)
+    CHECK (conversion_likelihood >= 0 AND conversion_likelihood <= 1),
   recommendation TEXT CHECK (recommendation IN (
     'HIGH_POTENTIAL','MEDIUM_POTENTIAL','LOW_POTENTIAL','NEEDS_MORE_DATA'
   )),
