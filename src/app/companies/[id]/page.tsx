@@ -161,7 +161,7 @@ export default async function CompanyIntelligencePage({
 
   if (!company) notFound();
 
-  const [evidence, signals, identifiers, icps, offerings, links] =
+  const [evidence, signals, identifiers, icps, offerings, links, researchRuns] =
     await Promise.all([
       sql<EvidenceView[]>`
         SELECT
