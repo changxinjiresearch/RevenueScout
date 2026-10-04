@@ -101,6 +101,8 @@ export default async function CompanyIntelligencePage({
     duplicate?: string;
     created?: string;
     triaged?: string;
+    research?: string;
+    research_error?: string;
   }>;
 }) {
   const user = await requireUser();
