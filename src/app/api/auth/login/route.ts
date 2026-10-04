@@ -27,5 +27,5 @@ export async function POST(request: NextRequest) {
   }
 
   await createSession(user.id);
-  return NextResponse.redirect(new URL("/setup", request.url), 303);
+  return NextResponse.redirect(new URL("/onboarding", request.url), 303);
 }
