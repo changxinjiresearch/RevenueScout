@@ -92,7 +92,7 @@ export async function POST(
         exclude_rejected AS "excludeRejected",
         exclude_unsubscribed AS "excludeUnsubscribed",
         employee_exclude_below AS "employeeExcludeBelow",
-        employee_exclude_above AS "employeExcludeAbove"
+        employee_exclude_above AS "employeeExcludeAbove"
       FROM icps
       WHERE organization_id = ${user.organizationId}
     `,
@@ -286,8 +286,23 @@ export async function POST(
         UPDATE companies
         SET
           website = COALESCE(website, NULLIF(${website ?? ""}, '')),
-          domain = COALESCE((€€€€€€€€€€€‘½µ…¥¸°(€€€€€€€€€€€€‘íÝ•‰Í¥Ñ”€ü¹•ÜUI0¡Ý•‰Í¥Ñ”¤¹¡½ÍÑ¹…µ”¹É•Á±…” ½yÝÝÝp¸¼°€ˆˆ¤€è¹Õ±±ô(€€€€€€€€¤°(€€€€€€€€€‘•ÍÉ¥ÁÑ¥½¸€ô=1M ¢FW67&—F–öâÀ¢åTÄÄ”b‚G·&W7VÇBæ'W6–æW757VÖÖ'’çG&–Ò‚—ÒÂrr¢’À¢–æGW7G'’Ò4ôÄU44R‚ˆ[™\ÝžKˆÐTÑBˆÒSˆ	Ü™\Ý[š[™\ÝžHOOHˆˆ	‰ˆ™\Ý[™]šY[˜ÙPÛÛ™šY[˜ÙHHM_BˆSˆ•SQŠ	Ü™\Ý[š[™\Ýž_K	ÉÊBˆSÑH•SˆS‘ˆ
-KˆÝXš[™\ÝžHHÓÐSTÐÑJ
+          domain = COALESCE(
+            domain,
+            ${website ? new URL(website).hostname.replace(/^www\./, "") : null}
+          ),
+          description = COALESCE(
+            description,
+            NULLIF(${result.businessSummary.trim()}, '')
+          ),
+          industry = COALESCE(
+            industry,
+            CASE
+              WHEN ${result.industry !== "" && result.evidenceConfidence >= 55}
+              THEN NULLIF(${result.industry}, '')
+              ELSE NULL
+            END
+          ),
+          subindustry = COALESCE(
             subindustry,
             CASE
               WHEN ${result.subindustry !== "" && result.evidenceConfidence >= 55}
@@ -323,26 +338,26 @@ KˆÝXš[™\ÝžHHÓÐSTÐÑJ
           END,
           currently_hiring =
             currently_hiring OR ${currentVerified.some(
-            (item) => item.signalType === "HIRING",
+              (item) => item.signalType === "HIRING",
             )},
           fast_growth =
             fast_growth OR ${currentVerified.some(
-            (item) =>
-              item.signalType === "GROWTH" ||
-              item.signalType === "EXPANSION",
+              (item) =>
+                item.signalType === "GROWTH" ||
+                item.signalType === "EXPANSION",
             )},
           recent_funding =
             recent_funding OR ${currentVerified.some(
-            (item) => item.signalType === "FUNDING",
-           )},
+              (item) => item.signalType === "FUNDING",
+            )},
           multi_location =
             multi_location OR ${result.serviceRegions.length > 1},
           digital_need =
             digital_need OR ${currentVerified.some(
-            (item) =>
-              item.signalType === "TECHNOLOGY" ||
-              item.signalType === "OPERATIONAL_PAIN",
-           )},
+              (item) =>
+                item.signalType === "TECHNOLOGY" ||
+                item.signalType === "OPERATIONAL_PAIN",
+            )},
           updated_at = NOW()
         WHERE id = ${id}
           AND organization_id = ${user.organizationId}
