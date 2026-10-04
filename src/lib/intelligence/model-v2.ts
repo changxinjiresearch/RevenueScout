@@ -129,13 +129,8 @@ function scoreIcp(
         )
       : null;
 
-  const featureEmployeeMid =
-    features.employeeLow >= 0 && features.employeeHigh >= features.employeeLow
-      ? Math.round((features.employeeLow + features.employeeHigh) / 2)
-      : null;
-
   const employeeMid =
-    claimEmployeeMid ?? company.employeeCount ?? featureEmployeeMid;
+    claimEmployeeMid ?? company.employeeCount;
 
   const industryClaim = liveClaim(claims, "INDUSTRY");
   const industryValue =
@@ -154,9 +149,9 @@ function scoreIcp(
       : "";
 
   const effectiveIndustry =
-    company.industry || industryValue || features.industry || "";
+    company.industry || industryValue || "";
   const effectiveSubindustry =
-    company.subindustry || subindustryValue || features.subindustry || "";
+    company.subindustry || subindustryValue || "";
 
   const regionClaims = liveClaims(claims, ["SERVICE_REGION"]).map(
     (claim) => {
@@ -171,9 +166,7 @@ function scoreIcp(
   const effectiveRegions =
     company.serviceRegions.length > 0
       ? company.serviceRegions
-      : regionClaims.length > 0
-        ? regionClaims
-        : features.serviceRegions;
+      : regionClaims;
 
   const hasHiring = Boolean(liveClaim(claims, "HIRING", "present"));
   const hasGrowth = Boolean(
@@ -444,7 +437,7 @@ function needScore(claims: ValidatedClaim[]): number | null {
 
 function employeeMidpointFromClaims(
   claims: ValidatedClaim[],
-  features: ExtractedCompanyFeatures,
+  companyEmployeeCount: number | null,
 ): number | null {
   const claim = liveClaim(claims, "EMPLOYEE_RANGE");
 
@@ -457,19 +450,20 @@ function employeeMidpointFromClaims(
     }
   }
 
-  if (features.employeeLow >= 0 && features.employeeHigh >= features.employeeLow) {
-    return Math.round((features.employeeLow + features.employeeHigh) / 2);
-  }
-
-  return null;
+  return companyEmployeeCount && companyEmployeeCount > 0
+    ? companyEmployeeCount
+    : null;
 }
 
 function budgetFitScore(
   claims: ValidatedClaim[],
-  features: ExtractedCompanyFeatures,
+  companyEmployeeCount: number | null,
   offerings: OfferingConfig[],
 ): number | null {
-  const employees = employeeMidpointFromClaims(claims, features);
+  const employees = employeeMidpointFromClaims(
+    claims,
+    companyEmployeeCount,
+  );
   if (employees === null) return null;
 
   const typicalDeal = Math.max(
@@ -734,7 +728,7 @@ export function runConversionModelV2(input: {
   const need = needScore(input.validation.claims);
   const budget = budgetFitScore(
     input.validation.claims,
-    input.features,
+    input.company.employeeCount,
     input.offerings,
   );
 
