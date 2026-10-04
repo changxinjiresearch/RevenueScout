@@ -88,6 +88,7 @@ export default async function CompanyIntelligencePage({
       legal_name AS "legalName",
       website,
       domain,
+      logo_url AS "logoUrl",
       description,
       country,
       state,
