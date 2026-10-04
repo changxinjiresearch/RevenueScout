@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { publicUrl } from "@/lib/http/public-url";
 import { requireUser } from "@/lib/auth/session";
 import {
   getInvitationByToken,
@@ -14,14 +15,14 @@ export async function POST(request: NextRequest) {
 
   if (!invitation) {
     return NextResponse.redirect(
-      new URL("/workspace?error=Invitation+is+invalid+or+expired", request.url),
+      publicUrl(request, "/workspace?error=Invitation+is+invalid+or+expired"),
       303,
     );
   }
 
   if (user.email.toLowerCase() !== invitation.email.toLowerCase()) {
     return NextResponse.redirect(
-      new URL("/workspace?error=Invitation+email+does+not+match+your+account", request.url),
+      publicUrl(request, "/workspace?error=Invitation+email+does+not+match+your+account"),
       303,
     );
   }
@@ -48,5 +49,5 @@ export async function POST(request: NextRequest) {
     `;
   });
 
-  return NextResponse.redirect(new URL("/", request.url), 303);
+  return NextResponse.redirect(publicUrl(request, "/"), 303);
 }
