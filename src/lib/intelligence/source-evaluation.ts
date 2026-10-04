@@ -165,7 +165,9 @@ export function sourceQuality(
     if (claimType === "INDUSTRY" || claimType === "SUBINDUSTRY") return 0.9;
     if (claimType === "HIRING") return 0.9;
     if (claimType === "EMPLOYEE_RANGE") return 0.82;
-    if (claimType === "TECHNOLOGY") return 0.82;
+    if (claimType === "TECHNOLOGY" || claimType === "TECHNOLOGY_USE") {
+      return 0.82;
+    }
     if (claimType === "LEADERSHIP") return 0.86;
     if (claimType === "EXPANSION") return 0.86;
     if (claimType === "FUNDING") return 0.82;
