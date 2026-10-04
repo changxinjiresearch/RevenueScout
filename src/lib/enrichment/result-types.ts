@@ -50,6 +50,12 @@ export type WebResearchResult = {
     | "REJECT"
     | "DEPRIORITISE_RESEARCH";
   unknownDimensions: string[];
+  researchTargets: Array<{
+    target: string;
+    reason: string;
+    valueScore: number;
+    status: "UNKNOWN" | "SINGLE_SOURCE" | "CONFLICTED";
+  }>;
   assessmentSummary: string;
   whyFit: string[];
   whyNow: string[];
