@@ -133,7 +133,7 @@ function featureClaimsFromPage(
 
   for (const technology of features.technologies) {
     candidates.push({
-      claimType: "TECHNOLOGY",
+      claimType: "TECHNOLOGY_USE",
       claimKey: normaliseKey(technology),
       value: { technology },
       evidence: evidenceForPage(page, page.text.slice(0, 500), 0.72, officialWebsite),
