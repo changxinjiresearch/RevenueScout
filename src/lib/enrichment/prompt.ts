@@ -1,4 +1,4 @@
-export const WEB_RESEARCH_PROMPT_VERSION = "v1";
+export const WEB_RESEARCH_PROMPT_VERSION = "web-enrichment-v1";
 
 export function buildWebResearchPrompt(context: unknown): string {
   return [
