@@ -5,7 +5,7 @@ milestones.
 
 ## M0 — Repository and decision-engine foundation
 
-Status: **in progress**
+Status: **completed**
 
 - project scaffold
 - frozen product specification

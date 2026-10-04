@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { demoOpportunities } from "@/data/demo-opportunities";
 import { assessOpportunity } from "@/lib/domain/opportunity-score";
 
@@ -31,7 +32,7 @@ export default function Home() {
             The opportunities most worth your sales time right now.
           </p>
         </div>
-        <div className="status-pill">MVP vertical slice</div>
+        <div className="top-actions"><Link className="status-pill" href="/setup">Market Setup</Link><div className="status-pill">MVP vertical slice</div></div>
       </header>
 
       <section className="summary-grid" aria-label="Today summary">
