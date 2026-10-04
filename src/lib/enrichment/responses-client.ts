@@ -54,6 +54,24 @@ export function extractResearchSourceUrls(
   return [...urls];
 }
 
+function host(value: string): string | null {
+  try {
+    return new URL(value).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+export function sourceWasRetrieved(
+  sourceUrl: string,
+  retrievedUrls: string[],
+): boolean {
+  if (retrievedUrls.includes(sourceUrl)) return true;
+  const sourceHost = host(sourceUrl);
+  if (!sourceHost) return false;
+  return retrievedUrls.some((url) => host(url) === sourceHost);
+}
+
 export async function runCompanyEnrichment(
   apiKey: string,
   context: unknown,
