@@ -205,6 +205,41 @@ function prioritizeLinks(urls: string[]): string[] {
   });
 }
 
+async function fetchWithSafeRedirects(initial: URL): Promise<Response> {
+  let current = new URL(initial.toString());
+
+  for (let hop = 0; hop < 5; hop += 1) {
+    await assertPublicHost(current.hostname);
+
+    const response = await fetch(current, {
+      headers: {
+        Accept: "text/html,application/xhtml+xml",
+        "User-Agent": USER_AGENT,
+      },
+      redirect: "manual",
+      signal: AbortSignal.timeout(7_000),
+    });
+
+    if (![301, 302, 303, 307, 308].includes(response.status)) {
+      return response;
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      throw new Error("Redirect response did not include a location.");
+    }
+
+    const next = validPublicUrl(new URL(location, current).toString());
+    if (!next) {
+      throw new Error("Redirect target is not a valid public URL.");
+    }
+
+    current = next;
+  }
+
+  throw new Error("Too many redirects.");
+}
+
 async function fetchHtml(urlValue: string): Promise<{
   finalUrl: URL;
   html: string;
@@ -215,16 +250,7 @@ async function fetchHtml(urlValue: string): Promise<{
   const requested = validPublicUrl(urlValue);
   if (!requested) return null;
 
-  await assertPublicHost(requested.hostname);
-
-  const response = await fetch(requested, {
-    headers: {
-      Accept: "text/html,application/xhtml+xml",
-      "User-Agent": USER_AGENT,
-    },
-    redirect: "follow",
-    signal: AbortSignal.timeout(7_000),
-  });
+  const response = await fetchWithSafeRedirects(requested);
 
   if (!response.ok) return null;
 
