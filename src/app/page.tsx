@@ -192,7 +192,7 @@ export default async function Home() {
         </div>
         <p>
           {user
-            ? "Ranked using your current ICP and Offering configuration. Hard exclusions are removed before ranking."
+            ? "Ranked using your current ICP and Offering configuration. Core ICP qualification gates and hard exclusions are applied before scoring and ranking."
             : "Demo data shows the decision surface. Create a workspace to make ICP Fit and deal value respond to your own configuration."}
         </p>
       </section>
