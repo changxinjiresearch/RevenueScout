@@ -131,6 +131,8 @@ export default async function SetupPage({
         <Link className="brand-link" href="/">RevenueScout</Link>
         <div className="nav-links">
           <Link href="/">Today</Link>
+          <Link href="/discover">Discover</Link>
+          <Link href="/companies">Companies</Link>
           <Link className="nav-active" href="/setup">Market Setup</Link>
           <Link href="/workspace">Workspace</Link>
           <form action="/api/auth/logout" method="post">

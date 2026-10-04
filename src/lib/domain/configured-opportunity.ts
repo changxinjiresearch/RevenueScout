@@ -18,7 +18,7 @@ export interface CandidateCompanyFacts {
   businessModels: string[];
   technologies: string[];
   digitalNeed: boolean;
-  entityType: "PRIVATE" | "GOVERNMENT" | "NONPROFIT";
+  entityType: "PRIVATE" | "GOVERNMENT" | "NONPROFIT" | "UNKNOWN";
   existingCustomer: boolean;
   rejected: boolean;
   unsubscribed: boolean;
