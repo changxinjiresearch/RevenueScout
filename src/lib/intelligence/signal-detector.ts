@@ -8,6 +8,7 @@ import type {
 import type {
   WebResearchObservation,
 } from "../enrichment/result-types";
+import { registrableFamily } from "./source-evaluation";
 
 type SignalRule = {
   type: SignalType;
@@ -175,9 +176,20 @@ function dateFromText(value: string): string | null {
   return null;
 }
 
-function sourceTypeForPage(page: CollectedPage): string {
+function sourceTypeForPage(
+  page: CollectedPage,
+  officialWebsite?: string,
+): string {
   if (page.pageKind === "CAREERS") return "JOB_BOARD";
   if (page.pageKind === "NEWS") return "NEWS";
+
+  if (
+    officialWebsite &&
+    registrableFamily(page.url) !== registrableFamily(officialWebsite)
+  ) {
+    return "OTHER";
+  }
+
   return "COMPANY_WEBSITE";
 }
 
@@ -193,6 +205,7 @@ function verificationForPage(
 export function detectBuyingSignals(
   pages: CollectedPage[],
   now = new Date(),
+  officialWebsite?: string,
 ): WebResearchObservation[] {
   const observations: WebResearchObservation[] = [];
   const seen = new Set<string>();
@@ -233,7 +246,7 @@ export function detectBuyingSignals(
         }
 
         observations.push({
-          sourceType: sourceTypeForPage(page),
+          sourceType: sourceTypeForPage(page, officialWebsite),
           sourceTitle: page.title || new URL(page.url).hostname,
           sourceUrl: page.url,
           title: rule.label,
