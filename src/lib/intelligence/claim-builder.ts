@@ -9,14 +9,26 @@ import type {
   ExistingEvidenceInput,
 } from "./claims";
 import type { CollectedPage, CollectorResult } from "./types";
+import { registrableFamily } from "./source-evaluation";
 
 function normaliseKey(value: string): string {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
-function pageSourceType(page: CollectedPage): string {
+function pageSourceType(
+  page: CollectedPage,
+  officialWebsite?: string,
+): string {
   if (page.pageKind === "CAREERS") return "JOB_BOARD";
   if (page.pageKind === "NEWS") return "NEWS";
+
+  if (
+    officialWebsite &&
+    registrableFamily(page.url) !== registrableFamily(officialWebsite)
+  ) {
+    return "OTHER";
+  }
+
   return "COMPANY_WEBSITE";
 }
 
@@ -24,9 +36,10 @@ function evidenceForPage(
   page: CollectedPage,
   excerpt: string,
   extractionConfidence: number,
+  officialWebsite?: string,
 ): ClaimEvidenceCandidate {
   return {
-    sourceType: pageSourceType(page),
+    sourceType: pageSourceType(page, officialWebsite),
     sourceUrl: page.url,
     sourceTitle: page.title || new URL(page.url).hostname,
     excerpt: excerpt.slice(0, 700),
@@ -39,6 +52,7 @@ function evidenceForPage(
 function featureClaimsFromPage(
   page: CollectedPage,
   icps: IcpRule[],
+  officialWebsite?: string,
 ): ClaimCandidate[] {
   const collector: CollectorResult = {
     officialWebsite: page.url,
@@ -60,6 +74,7 @@ function featureClaimsFromPage(
         page,
         page.description || page.text.slice(0, 500),
         features.industryConfidence,
+        officialWebsite,
       ),
     });
   }
@@ -73,6 +88,7 @@ function featureClaimsFromPage(
         page,
         page.description || page.text.slice(0, 500),
         Math.max(0.6, features.industryConfidence - 0.05),
+        officialWebsite,
       ),
     });
   }
@@ -92,6 +108,7 @@ function featureClaimsFromPage(
         page,
         page.text.slice(0, 700),
         features.employeeConfidence,
+        officialWebsite,
       ),
     });
   }
@@ -101,7 +118,7 @@ function featureClaimsFromPage(
       claimType: "SERVICE_REGION",
       claimKey: normaliseKey(region),
       value: { region },
-      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.72),
+      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.72, officialWebsite),
     });
   }
 
@@ -110,7 +127,7 @@ function featureClaimsFromPage(
       claimType: "BUSINESS_MODEL",
       claimKey: normaliseKey(businessModel),
       value: { businessModel },
-      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.68),
+      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.68, officialWebsite),
     });
   }
 
@@ -119,7 +136,7 @@ function featureClaimsFromPage(
       claimType: "TECHNOLOGY",
       claimKey: normaliseKey(technology),
       value: { technology },
-      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.72),
+      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.72, officialWebsite),
     });
   }
 
@@ -128,7 +145,7 @@ function featureClaimsFromPage(
       claimType: "DECISION_ROLE",
       claimKey: normaliseKey(role),
       value: { role },
-      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.7),
+      evidence: evidenceForPage(page, page.text.slice(0, 500), 0.7, officialWebsite),
     });
   }
 
@@ -239,7 +256,11 @@ export function buildClaimCandidates(input: {
   icps: IcpRule[];
 }): ClaimCandidate[] {
   const collectedFeatureClaims = input.collector.pages.flatMap((page) =>
-    featureClaimsFromPage(page, input.icps),
+    featureClaimsFromPage(
+      page,
+      input.icps,
+      input.collector.officialWebsite || undefined,
+    ),
   );
 
   const persistedEvidenceClaims = input.existingEvidence.flatMap((evidence) =>
