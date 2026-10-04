@@ -319,7 +319,39 @@ export default async function CompanyIntelligencePage({
 
   const primaryEvidence = evidence[0] ?? null;
   const lei = identifiers.find((item) => item.identifierType === "LEI");
-  const hasMissing = triage.missingFields.length > 0;
+  const engineResult =
+    researchRun?.status === "COMPLETED"
+      ? researchRun.structuredResult
+      : null;
+
+  const displayTriageStatus = engineResult
+    ? engineResult.priorityAction === "CONTACT_NOW"
+      ? "HIGH_POTENTIAL"
+      : engineResult.priorityAction === "REJECT"
+        ? "LOW_POTENTIAL"
+        : engineResult.priorityAction === "REVIEW"
+          ? "MEDIUM_POTENTIAL"
+          : "NEEDS_ENRICHMENT"
+    : triage.status;
+
+  const displayTriageScore =
+    engineResult?.overallPotentialScore ?? triage.score;
+  const displayTriageHeadline =
+    engineResult?.assessmentSummary ?? triage.headline;
+  const displayTriageReasons = engineResult
+    ? [...engineResult.whyFit, ...engineResult.whyNow].slice(0, 4)
+    : triage.reasons;
+  const displayMissingFields =
+    engineResult?.unknownDimensions ?? triage.missingFields;
+  const hasMissing = displayMissingFields.length > 0;
+
+  const displayRecommendation = engineResult
+    ? engineResult.priorityAction === "CONTACT_NOW"
+      ? "ADD_TO_PIPELINE"
+      : engineResult.priorityAction === "REJECT"
+        ? "REJECT"
+        : "REVIEW"
+    : triage.recommendation;
 
   return (
     <main className="setup-shell">
@@ -642,16 +674,16 @@ export default async function CompanyIntelligencePage({
       <section className="triage-hero">
         <div className="triage-main">
           <div className="triage-label-row">
-            <span className={`triage-pill ${triageClass(triage.status)}`}>
-              {triageText(triage.status)}
+            <span className={`triage-pill ${triageClass(displayTriageStatus)}`}>
+              {triageText(displayTriageStatus)}
             </span>
-            {triage.score !== null ? (
-              <span className="triage-score">{triage.score}/100</span>
+            {displayTriageScore !== null ? (
+              <span className="triage-score">{displayTriageScore}/100</span>
             ) : null}
           </div>
-          <h2>{triage.headline}</h2>
+          <h2>{displayTriageHeadline}</h2>
           <ul className="triage-reasons">
-            {triage.reasons.map((reason) => (
+            {displayTriageReasons.map((reason) => (
               <li key={reason}>{reason}</li>
             ))}
           </ul>
@@ -660,7 +692,7 @@ export default async function CompanyIntelligencePage({
             <div className="missing-strip">
               <strong>Only these fields still block a confident ICP decision:</strong>
               <div>
-                {triage.missingFields.map((field) => (
+                {displayMissingFields.map((field) => (
                   <span key={field}>{field}</span>
                 ))}
               </div>
@@ -671,9 +703,9 @@ export default async function CompanyIntelligencePage({
         <aside className="triage-action-panel">
           <span className="field-label">Recommended action</span>
           <strong>
-            {triage.recommendation === "ADD_TO_PIPELINE"
+            {displayRecommendation === "ADD_TO_PIPELINE"
               ? "Add to pipeline"
-              : triage.recommendation === "REJECT"
+              : displayRecommendation === "REJECT"
                 ? "Reject"
                 : "Review"}
           </strong>
