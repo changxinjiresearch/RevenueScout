@@ -323,7 +323,7 @@ export async function POST(
     );
     const technologies = claimStringValues(
       claims,
-      "TECHNOLOGY",
+      "TECHNOLOGY_USE",
       "technology",
     );
     const decisionRoles = claimStringValues(
