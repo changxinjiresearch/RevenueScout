@@ -5,7 +5,12 @@ import type {
 import { collectPublicPages } from "./collector";
 import { extractCompanyFeatures } from "./feature-extractor";
 import { detectBuyingSignals } from "./signal-detector";
-import { runConversionModelV1 } from "./model-v1";
+import { buildClaimCandidates } from "./claim-builder";
+import { validateClaims } from "./cross-validation";
+import { runConversionModelV2 } from "./model-v2";
+import type {
+  ExistingEvidenceInput,
+} from "./claims";
 import type { LocalIntelligenceRun } from "./types";
 
 export type IntelligenceCompanyInput = {
@@ -24,19 +29,24 @@ export type IntelligenceCompanyInput = {
   entityType: "PRIVATE" | "GOVERNMENT" | "NONPROFIT" | "UNKNOWN";
 };
 
-export async function runRevenueScoutIntelligenceV1(input: {
+export async function runRevenueScoutIntelligenceV2(input: {
   company: IntelligenceCompanyInput;
-  evidenceUrls: string[];
+  existingEvidence: ExistingEvidenceInput[];
   icps: IcpRule[];
   offerings: OfferingConfig[];
   now?: Date;
 }): Promise<LocalIntelligenceRun> {
+  const now = input.now ?? new Date();
+
   const collector = await collectPublicPages({
     displayName: input.company.displayName,
     legalName: input.company.legalName,
     website: input.company.website,
     domain: input.company.domain,
-    evidenceUrls: input.evidenceUrls,
+    evidenceUrls: input.existingEvidence
+      .map((item) => item.sourceUrl)
+      .filter(Boolean),
+    maxPages: 10,
   });
 
   const features = extractCompanyFeatures({
@@ -46,10 +56,19 @@ export async function runRevenueScoutIntelligenceV1(input: {
 
   const observations = detectBuyingSignals(
     collector.pages,
-    input.now ?? new Date(),
+    now,
   );
 
-  const result = runConversionModelV1({
+  const claimCandidates = buildClaimCandidates({
+    collector,
+    observations,
+    existingEvidence: input.existingEvidence,
+    icps: input.icps,
+  });
+
+  const validation = validateClaims(claimCandidates, now);
+
+  const result = runConversionModelV2({
     company: {
       displayName: input.company.displayName,
       country: input.company.country,
@@ -64,19 +83,21 @@ export async function runRevenueScoutIntelligenceV1(input: {
     },
     collector,
     features,
-    signals: observations,
+    validation,
+    observations,
     icps: input.icps,
     offerings: input.offerings,
-    now: input.now,
+    now,
   });
 
   return {
     result,
     sourceUrls: collector.pages.map((page) => page.url),
-    engine: "REVENUESCOUT_INTELLIGENCE_V1",
-    model: "RS_CONVERSION_V1",
+    engine: "REVENUESCOUT_INTELLIGENCE_V2",
+    model: "RS_CONVERSION_V2",
     collector,
     observations,
+    validation,
   };
 }
 
