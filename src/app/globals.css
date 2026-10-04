@@ -1619,3 +1619,310 @@ select {
     flex-direction: column;
   }
 }
+
+
+/* M2 fast company triage */
+.discovery-result-head,
+.triage-label-row,
+.fast-review-header,
+.triage-actions,
+.missing-strip > div {
+  display: flex;
+  align-items: center;
+}
+
+.discovery-result-head,
+.fast-review-header {
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.triage-pill {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  border-radius: 999px;
+  padding: 7px 10px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.triage-high {
+  background: #eaf8ef;
+  color: #287149;
+}
+
+.triage-medium {
+  background: #eef4ff;
+  color: #3157a7;
+}
+
+.triage-low {
+  background: #fff0f0;
+  color: #9b3b3b;
+}
+
+.triage-review {
+  background: #fff7e8;
+  color: #9b6a25;
+}
+
+.discovery-precheck {
+  margin: 14px 0 4px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #f7f9fc;
+}
+
+.discovery-precheck p {
+  margin: 5px 0 0;
+  color: #707d93;
+  line-height: 1.45;
+}
+
+.fast-review-header {
+  padding: 42px 0 24px;
+}
+
+.fast-review-header h1 {
+  margin-bottom: 6px;
+  font-size: clamp(38px, 6vw, 62px);
+}
+
+.fast-review-header p {
+  margin: 0;
+  color: #748096;
+}
+
+.triage-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 16px;
+  margin: 18px 0;
+}
+
+.triage-main,
+.triage-action-panel,
+.fast-panel,
+.essential-enrichment,
+.advanced-review {
+  border: 1px solid #e0e6ef;
+  border-radius: 20px;
+  background: #fff;
+}
+
+.triage-main,
+.triage-action-panel,
+.fast-panel,
+.essential-enrichment {
+  padding: 22px;
+}
+
+.triage-label-row {
+  gap: 10px;
+}
+
+.triage-score {
+  color: #56637a;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.triage-main h2,
+.triage-action-panel strong,
+.fast-panel h2,
+.essential-enrichment h2 {
+  color: #172033;
+}
+
+.triage-main h2 {
+  margin: 12px 0;
+  font-size: 28px;
+}
+
+.triage-reasons {
+  margin: 0;
+  padding-left: 19px;
+  color: #556178;
+  line-height: 1.6;
+}
+
+.missing-strip {
+  margin-top: 18px;
+  padding: 14px;
+  border-radius: 14px;
+  background: #fff8e9;
+}
+
+.missing-strip strong {
+  display: block;
+  margin-bottom: 9px;
+  color: #7d5a20;
+  font-size: 12px;
+}
+
+.missing-strip > div {
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.missing-strip span {
+  border-radius: 999px;
+  background: #fff;
+  padding: 5px 8px;
+  color: #745824;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.triage-action-panel {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.triage-action-panel > strong {
+  margin: 6px 0;
+  font-size: 25px;
+}
+
+.triage-action-panel p {
+  color: #748096;
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.triage-actions {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fast-facts-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 16px;
+  margin: 16px 0;
+}
+
+.fast-panel h2 {
+  margin: 4px 0 16px;
+}
+
+.fast-facts {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.muted-copy {
+  color: #778397;
+  line-height: 1.55;
+}
+
+.essential-enrichment {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 24px;
+  margin: 16px 0;
+}
+
+.essential-enrichment p {
+  color: #748096;
+  line-height: 1.55;
+}
+
+.essential-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.essential-form label {
+  display: grid;
+  gap: 7px;
+  color: #59657b;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.advanced-review {
+  overflow: hidden;
+  margin: 18px 0 42px;
+}
+
+.advanced-review > summary,
+.nested-advanced > summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.advanced-review > summary {
+  padding: 18px 20px;
+}
+
+.advanced-review > summary span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.advanced-review > summary small {
+  color: #8b95a7;
+}
+
+.advanced-review-body {
+  display: grid;
+  gap: 28px;
+  padding: 0 20px 22px;
+  border-top: 1px solid #edf0f5;
+}
+
+.advanced-review-body > section {
+  padding-top: 20px;
+}
+
+.nested-advanced {
+  border-top: 1px solid #edf0f5;
+  padding-top: 18px;
+}
+
+.nested-advanced > summary {
+  padding: 8px 0 14px;
+  font-weight: 800;
+}
+
+@media (max-width: 860px) {
+  .triage-hero,
+  .fast-facts-grid,
+  .essential-enrichment {
+    grid-template-columns: 1fr;
+  }
+
+  .fast-review-header,
+  .discovery-result-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 650px) {
+  .essential-form,
+  .fast-facts {
+    grid-template-columns: 1fr;
+  }
+
+  .triage-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .triage-actions form,
+  .triage-actions button {
+    width: 100%;
+  }
+}

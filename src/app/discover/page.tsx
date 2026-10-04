@@ -4,8 +4,26 @@ import { db } from "@/lib/db";
 import { jsonArrayValue } from "@/lib/db/json-value";
 import { listDiscoveryProviders } from "@/lib/discovery/providers";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
+import { assessDiscoveryCandidate } from "@/lib/companies/triage";
 
 export const dynamic = "force-dynamic";
+
+function sourcePageUrl(candidate: DiscoveryCandidate): string {
+  if (candidate.provider === "GLEIF") {
+    return `https://search.gleif.org/#/record/${encodeURIComponent(
+      candidate.providerRecordId,
+    )}`;
+  }
+
+  return candidate.sourceUrl;
+}
+
+function triageLabel(status: string): string {
+  if (status === "HIGH_POTENTIAL") return "High potential";
+  if (status === "MEDIUM_POTENTIAL") return "Medium potential";
+  if (status === "LOW_POTENTIAL") return "Low potential";
+  return "Needs enrichment";
+}
 
 type Named = { id: string; name: string };
 
@@ -195,57 +213,85 @@ export default async function DiscoverPage({
             </div>
           ) : (
             <div className="discovery-results">
-              {run.results.map((candidate, index) => (
-                <article className="discovery-result-card" key={candidate.providerRecordId}>
-                  <div>
-                    <span className="source-badge">{candidate.provider}</span>
-                    <h3>{candidate.displayName}</h3>
-                    <p>
-                      {[candidate.city, candidate.state, candidate.country]
-                        .filter(Boolean)
-                        .join(", ") || "Location unavailable"}
-                    </p>
-                    <p className="discovery-description">
-                      {candidate.description ?? "No provider description."}
-                    </p>
-                  </div>
-                  <div className="discovery-data-grid">
-                    <span>
-                      <small>LEI / provider ID</small>
-                      <strong>{candidate.providerRecordId}</strong>
-                    </span>
-                    <span>
-                      <small>Industry</small>
-                      <strong>{candidate.industry ?? "Needs enrichment"}</strong>
-                    </span>
-                    <span>
-                      <small>Employees</small>
-                      <strong>{candidate.employeeCount ?? "Needs enrichment"}</strong>
-                    </span>
-                    <span>
-                      <small>ICP Fit</small>
-                      <strong>Pending enrichment</strong>
-                    </span>
-                  </div>
-                  <div className="discovery-result-actions">
-                    <a
-                      href={candidate.sourceUrl}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="secondary-link"
-                    >
-                      View source
-                    </a>
-                    <form action="/api/discovery/import" method="post">
-                      <input type="hidden" name="runId" value={run.id} />
-                      <input type="hidden" name="candidateIndex" value={index} />
-                      <button className="primary-button" type="submit">
-                        Import company
-                      </button>
-                    </form>
-                  </div>
-                </article>
-              ))}
+              {run.results.map((candidate, index) => {
+                const precheck = assessDiscoveryCandidate(candidate);
+                const lowPotential = precheck.status === "LOW_POTENTIAL";
+
+                return (
+                  <article
+                    className="discovery-result-card"
+                    key={candidate.providerRecordId}
+                  >
+                    <div className="discovery-result-head">
+                      <div>
+                        <span className="source-badge">{candidate.provider}</span>
+                        <h3>{candidate.displayName}</h3>
+                        <p>
+                          {[candidate.city, candidate.state, candidate.country]
+                            .filter(Boolean)
+                            .join(", ") || "Location unavailable"}
+                        </p>
+                      </div>
+                      <span
+                        className={
+                          lowPotential
+                            ? "triage-pill triage-low"
+                            : "triage-pill triage-review"
+                        }
+                      >
+                        {triageLabel(precheck.status)}
+                      </span>
+                    </div>
+
+                    <div className="discovery-precheck">
+                      <strong>{precheck.headline}</strong>
+                      <p>{precheck.reasons[0]}</p>
+                    </div>
+
+                    <div className="discovery-data-grid">
+                      <span>
+                        <small>Entity category</small>
+                        <strong>
+                          {candidate.legalEntityCategory ?? "Not provided"}
+                        </strong>
+                      </span>
+                      <span>
+                        <small>Entity status</small>
+                        <strong>{candidate.entityStatus ?? "Not provided"}</strong>
+                      </span>
+                      <span>
+                        <small>Industry</small>
+                        <strong>{candidate.industry ?? "Needs enrichment"}</strong>
+                      </span>
+                      <span>
+                        <small>Employees</small>
+                        <strong>{candidate.employeeCount ?? "Needs enrichment"}</strong>
+                      </span>
+                    </div>
+
+                    <div className="discovery-result-actions">
+                      <a
+                        href={sourcePageUrl(candidate)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="secondary-link"
+                      >
+                        View source
+                      </a>
+                      <form action="/api/discovery/import" method="post">
+                        <input type="hidden" name="runId" value={run.id} />
+                        <input type="hidden" name="candidateIndex" value={index} />
+                        <button
+                          className={lowPotential ? "secondary-button" : "primary-button"}
+                          type="submit"
+                        >
+                          {lowPotential ? "Import anyway" : "Import & review"}
+                        </button>
+                      </form>
+                    </div>
+                  </article>
+                );
+              })}
             </div>
           )}
         </section>

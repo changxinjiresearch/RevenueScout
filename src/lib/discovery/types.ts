@@ -18,6 +18,16 @@ export type DiscoveryCandidate = {
   employeeRange: string | null;
   foundedYear: number | null;
   companyType: string | null;
+  legalEntityCategory: string | null;
+  legalEntitySubcategory: string | null;
+  entityStatus: string | null;
+  registrationStatus: string | null;
+  jurisdiction: string | null;
+  legalFormCode: string | null;
+  registrationAuthority: string | null;
+  registeredAs: string | null;
+  providerLastUpdatedAt: string | null;
+  rawSourceUrl: string | null;
   serviceRegions: string[];
   entityType: "PRIVATE" | "GOVERNMENT" | "NONPROFIT" | "UNKNOWN";
   sourceUrl: string;

@@ -24,7 +24,13 @@ type GleifRecord = {
       headquartersAddress?: GleifAddress;
       jurisdiction?: string | null;
       category?: string | null;
+      subCategory?: string | null;
       status?: string | null;
+      entityCreationDate?: string | null;
+      registrationAuthority?: {
+        registrationAuthorityID?: string | null;
+        registrationAuthorityEntityID?: string | null;
+      };
       legalForm?: {
         id?: string | null;
         other?: string | null;
@@ -71,11 +77,12 @@ export function mapGleifRecord(record: GleifRecord): DiscoveryCandidate | null {
   if (!legalName || !lei) return null;
 
   const address = entity?.legalAddress ?? entity?.headquartersAddress;
+  const legalFormCode = entity?.legalForm?.id?.trim() || null;
+  const legalFormLabel = entity?.legalForm?.other?.trim() || null;
+  const category = entity?.category?.trim() || null;
   const companyType =
-    entity?.legalForm?.other?.trim() ||
-    entity?.legalForm?.id?.trim() ||
-    entity?.category?.trim() ||
-    null;
+    legalFormLabel ||
+    (/\bpty\.?\s+ltd\.?\b/i.test(legalName) ? "Private" : null);
 
   const registrationStatus = registration?.status?.trim() || "unknown";
   const entityStatus = entity?.status?.trim() || "unknown";
@@ -101,11 +108,30 @@ export function mapGleifRecord(record: GleifRecord): DiscoveryCandidate | null {
     subindustry: null,
     employeeCount: null,
     employeeRange: null,
-    foundedYear: null,
+    foundedYear: entity?.entityCreationDate
+      ? new Date(entity.entityCreationDate).getUTCFullYear()
+      : null,
     companyType,
+    legalEntityCategory: category,
+    legalEntitySubcategory: entity?.subCategory?.trim() || null,
+    entityStatus,
+    registrationStatus,
+    jurisdiction: entity?.jurisdiction?.trim() || null,
+    legalFormCode,
+    registrationAuthority:
+      entity?.registrationAuthority?.registrationAuthorityID?.trim() || null,
+    registeredAs:
+      entity?.registrationAuthority?.registrationAuthorityEntityID?.trim() || null,
+    providerLastUpdatedAt: registration?.lastUpdateDate || null,
+    rawSourceUrl: `${GLEIF_API}/lei-records/${encodeURIComponent(lei)}`,
     serviceRegions: [],
-    entityType: "UNKNOWN",
-    sourceUrl: `${GLEIF_API}/lei-records/${encodeURIComponent(lei)}`,
+    entityType:
+      category === "FUND"
+        ? "UNKNOWN"
+        : companyType === "Private"
+          ? "PRIVATE"
+          : "UNKNOWN",
+    sourceUrl: `https://search.gleif.org/#/record/${encodeURIComponent(lei)}`,
     sourceLabel: "GLEIF LEI record",
     observedAt,
     sourceConfidence: 0.98,
@@ -162,6 +188,35 @@ export async function searchGleif(
 
     return countryMatches && regionMatches;
   });
+}
+
+
+export async function getGleifCandidateByLei(
+  lei: string,
+): Promise<DiscoveryCandidate | null> {
+  const trimmed = lei.trim().toUpperCase();
+  if (!/^[A-Z0-9]{20}$/.test(trimmed)) return null;
+
+  const response = await fetch(
+    `${GLEIF_API}/lei-records/${encodeURIComponent(trimmed)}`,
+    {
+      headers: {
+        Accept: "application/vnd.api+json",
+        "User-Agent":
+          "RevenueScout/0.2 (+https://revenuescout-web-production.up.railway.app)",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`GLEIF lookup failed with HTTP ${response.status}.`);
+  }
+
+  const payload = (await response.json()) as { data?: GleifRecord };
+  return payload.data ? mapGleifRecord(payload.data) : null;
 }
 
 export const gleifProvider: DiscoveryProvider = {

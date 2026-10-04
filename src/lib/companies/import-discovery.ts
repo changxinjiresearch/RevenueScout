@@ -73,7 +73,7 @@ export async function importDiscoveryCandidate(input: {
         180,
         ${evidenceHash(candidate)},
         ${candidate.providerRecordId},
-        ${JSON.stringify(candidate)}::jsonb,
+        ${JSON.stringify(candidate)}::text::jsonb,
         ${userId}
       )
       ON CONFLICT (company_id, content_hash) WHERE content_hash IS NOT NULL
@@ -109,6 +109,15 @@ export async function importDiscoveryCandidate(input: {
         employee_range,
         founded_year,
         company_type,
+        legal_entity_category,
+        legal_entity_subcategory,
+        entity_status,
+        registration_status,
+        jurisdiction,
+        legal_form_code,
+        registration_authority,
+        registered_as,
+        provider_last_updated_at,
         service_regions,
         entity_type,
         source_origin,
@@ -132,6 +141,17 @@ export async function importDiscoveryCandidate(input: {
         ${candidate.employeeRange},
         ${candidate.foundedYear},
         ${candidate.companyType},
+        ${candidate.legalEntityCategory},
+        ${candidate.legalEntitySubcategory},
+        ${candidate.entityStatus},
+        ${candidate.registrationStatus},
+        ${candidate.jurisdiction},
+        ${candidate.legalFormCode},
+        ${candidate.registrationAuthority},
+        ${candidate.registeredAs},
+        ${candidate.providerLastUpdatedAt
+          ? new Date(candidate.providerLastUpdatedAt)
+          : null},
         ${candidate.serviceRegions},
         ${candidate.entityType},
         'DISCOVERY',
@@ -192,7 +212,7 @@ export async function importDiscoveryCandidate(input: {
         180,
         ${evidenceHash(candidate)},
         ${candidate.providerRecordId},
-        ${JSON.stringify(candidate)}::jsonb,
+        ${JSON.stringify(candidate)}::text::jsonb,
         ${userId}
       )
     `;
