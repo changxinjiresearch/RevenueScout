@@ -18,9 +18,13 @@ type DiscoveryRun = {
   status: string;
   resultCount: number;
   importedCount: number;
-  results: unknown;
+  results: DiscoveryCandidate[];
   errorMessage: string | null;
   createdAt: Date;
+};
+
+type DiscoveryRunRow = Omit<DiscoveryRun, "results"> & {
+  results: unknown;
 };
 
 export default async function DiscoverPage({
@@ -48,7 +52,7 @@ export default async function DiscoverPage({
   let run: DiscoveryRun | null = null;
 
   if (params.run) {
-    const [found] = await sql<DiscoveryRun[]>`
+    const [found] = await sql<DiscoveryRunRow[]>`
       SELECT
         id,
         provider,
