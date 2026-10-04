@@ -82,17 +82,32 @@ the decision surface in a traceable way.
 
 ## M2 — Company, evidence and buying signals
 
-- Company record
-- manual lead creation
-- company deduplication
-- evidence/source model
-- confidence and freshness
-- signal model
-- initial discovery-adapter contract
-- company intelligence page
+Status: **implementation complete; pending final production verification**
 
-Exit gate: companies can enter RevenueScout with traceable evidence and
-signals.
+- persistent Company record and company database
+- manual lead creation
+- deduplication by provider identifier, normalised domain, and normalised
+  company-name/country
+- explicit existing-customer / pipeline / contacted / rejected / unsubscribed
+  relationship states
+- evidence/source model with source URL, observation date, verification,
+  confidence, freshness and retained provenance
+- evidence-backed Buying Signal model for Hiring, Expansion, Funding,
+  Leadership, Technology, Potential Operational Pain, Growth and Procurement
+- per-company Signal Timeline
+- live discovery adapter contract
+- first real external provider: GLEIF LEI reference data
+- traceable discovery runs and import provenance
+- company intelligence / enrichment page
+- signed-in Today now reads persisted M2 companies, evidence and signals instead
+  of synthetic company fixtures
+- missing external fields remain explicitly missing; RevenueScout does not
+  invent industry, headcount or buying signals
+- synthetic fixtures remain only for signed-out demo mode
+
+Exit gate: companies can enter RevenueScout from a real external source or
+manual creation, duplicates are controlled, every buying signal points to stored
+evidence, and signed-in ranking is driven by persisted company intelligence.
 
 ## M3 — Opportunity intelligence
 
