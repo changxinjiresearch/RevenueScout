@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser } from "@/lib/auth/session";
 import { importDiscoveryCandidate } from "@/lib/companies/import-discovery";
 import { db } from "@/lib/db";
+import { jsonArrayValue } from "@/lib/db/json-value";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
 import { publicUrl } from "@/lib/http/public-url";
 
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest) {
   }
 
   const sql = db();
-  const [run] = await sql<{ results: DiscoveryCandidate[] }[]>`
+  const [run] = await sql<{ results: unknown }[]>`
     SELECT results
     FROM discovery_runs
     WHERE id = ${runId}
@@ -28,11 +29,12 @@ export async function POST(request: NextRequest) {
     LIMIT 1
   `;
 
-  if (!run || !Array.isArray(run.results)) {
+  if (!run) {
     return NextResponse.json({ error: "Discovery run not found." }, { status: 404 });
   }
 
-  const candidate = run.results[candidateIndex];
+  const results = jsonArrayValue<DiscoveryCandidate>(run.results);
+  const candidate = results[candidateIndex];
   if (!candidate) {
     return NextResponse.json({ error: "Discovery candidate not found." }, { status: 404 });
   }
