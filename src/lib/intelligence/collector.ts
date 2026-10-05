@@ -314,6 +314,7 @@ async function resolveWebsite(input: {
   website?: string | null;
   domain?: string | null;
   allowDomainGuess?: boolean;
+  maxDomainGuesses?: number;
 }): Promise<{
   url: string;
   confidence: number;
@@ -353,9 +354,13 @@ async function resolveWebsite(input: {
     [input.legalName, input.displayName].filter(Boolean) as string[],
   )];
 
+  const maxDomainGuesses = Math.max(
+    0,
+    Math.min(input.maxDomainGuesses ?? 6, 6),
+  );
   const domainCandidates = [
     ...new Set(names.flatMap(candidateDomainsFromName)),
-  ].slice(0, 6);
+  ].slice(0, maxDomainGuesses);
 
   for (const domain of domainCandidates) {
     const candidate = `https://${domain}`;
@@ -391,6 +396,7 @@ export async function collectPublicPages(input: {
   evidenceUrls?: string[];
   maxPages?: number;
   allowDomainGuess?: boolean;
+  maxDomainGuesses?: number;
 }): Promise<CollectorResult> {
   const maxPages = Math.max(1, Math.min(input.maxPages ?? 7, 10));
   const warnings: string[] = [];
