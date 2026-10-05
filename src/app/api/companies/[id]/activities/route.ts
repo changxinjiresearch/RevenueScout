@@ -229,6 +229,8 @@ export async function POST(
         company_id,
         stage,
         primary_contact_id,
+        origin_opportunity_snapshot_id,
+        origin_prediction_captured_at,
         next_action_at,
         first_contact_at,
         last_contact_at,
@@ -244,6 +246,15 @@ export async function POST(
         ${companyId},
         ${nextStage},
         ${contactId},
+        (
+          SELECT id
+          FROM opportunity_snapshots
+          WHERE organization_id = ${user.organizationId}
+            AND company_id = ${companyId}
+          ORDER BY created_at DESC
+          LIMIT 1
+        ),
+        NOW(),
         ${nextActionAt},
         ${isCompletedActivity && (activityType === "OUTREACH" || activityType === "FOLLOW_UP") ? now : null},
         ${isCompletedActivity && direction === "OUTBOUND" ? now : null},
@@ -260,6 +271,14 @@ export async function POST(
         primary_contact_id = COALESCE(
           company_sales_lifecycle.primary_contact_id,
           EXCLUDED.primary_contact_id
+        ),
+        origin_opportunity_snapshot_id = COALESCE(
+          company_sales_lifecycle.origin_opportunity_snapshot_id,
+          EXCLUDED.origin_opportunity_snapshot_id
+        ),
+        origin_prediction_captured_at = COALESCE(
+          company_sales_lifecycle.origin_prediction_captured_at,
+          EXCLUDED.origin_prediction_captured_at
         ),
         next_action_at = COALESCE(
           EXCLUDED.next_action_at,
