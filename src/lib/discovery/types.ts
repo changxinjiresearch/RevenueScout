@@ -31,6 +31,24 @@ export type DiscoveryProviderIdentifier = {
   identifierValue: string;
 };
 
+export type DiscoveryQualificationStatus =
+  | "QUALIFIED"
+  | "PARTIALLY_QUALIFIED"
+  | "NOT_QUALIFIED";
+
+export type DiscoveryPriorityBand = "HIGH" | "MEDIUM" | "RESEARCH";
+
+export type DiscoveryPriority = {
+  band: DiscoveryPriorityBand;
+  score: number;
+  relativePercentile: number;
+  rationale: string[];
+  qualificationStatus: DiscoveryQualificationStatus;
+  matchedFields: string[];
+  missingFields: string[];
+  failedFields: string[];
+};
+
 export type DiscoveryCandidate = {
   provider: DiscoveryProviderId;
   providerRecordId: string;
@@ -75,6 +93,7 @@ export type DiscoveryCandidate = {
   industryValidation?: DiscoveryIndustryValidation | null;
   matchedSemantics?: string[];
   providerIdentifiers?: DiscoveryProviderIdentifier[];
+  discoveryPriority?: DiscoveryPriority | null;
 };
 
 export type DiscoveryQuery = {
