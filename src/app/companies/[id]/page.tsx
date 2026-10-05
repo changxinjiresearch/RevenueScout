@@ -2104,49 +2104,22 @@ export default async function CompanyIntelligencePage({
                 LinkedIn
                 <input name="linkedinUrl" type="url" />
               </label>
-              <label>
-                Location
-                <input name="location" />
-              </label>
-              <label>
-                Decision relevance
-                <select name="decisionRelevance" defaultValue="UNKNOWN">
-                  <option value="PRIMARY_DECISION_MAKER">Primary decision maker</option>
-                  <option value="DECISION_MAKER">Decision maker</option>
-                  <option value="INFLUENCER">Influencer</option>
-                  <option value="CHAMPION">Champion</option>
-                  <option value="PROCUREMENT">Procurement</option>
-                  <option value="TECHNICAL">Technical</option>
-                  <option value="GATEKEEPER">Gatekeeper</option>
-                  <option value="UNKNOWN">Unknown</option>
-                </select>
-              </label>
+              <input type="hidden" name="location" value="" />
+              <input type="hidden" name="decisionRelevance" value="UNKNOWN" />
               <input type="hidden" name="contactabilityStatus" value="UNCERTAIN" />
               <input type="hidden" name="contactStatus" value="ACTIVE" />
-              <label>
-                Verification
-                <select name="verificationStatus" defaultValue="UNVERIFIED">
-                  <option value="CONFIRMED">Confirmed</option>
-                  <option value="LIKELY">Likely</option>
-                  <option value="UNVERIFIED">Unverified</option>
-                </select>
-              </label>
-              <label>
-                Confidence %
-                <input name="confidence" type="number" min="0" max="100" defaultValue="50" />
-              </label>
-              <label>
-                Source label
-                <input name="sourceLabel" defaultValue="Manual" />
-              </label>
-              <label>
-                Source URL
-                <input name="sourceUrl" type="url" />
-              </label>
+              <input type="hidden" name="verificationStatus" value="UNVERIFIED" />
+              <input type="hidden" name="confidence" value="50" />
+              <input type="hidden" name="sourceLabel" value="Manual" />
               <label className="span-2">
-                Notes
-                <textarea name="notes" />
+                Source URL
+                <input
+                  name="sourceUrl"
+                  type="url"
+                  placeholder="Optional page where you found this person"
+                />
               </label>
+              <input type="hidden" name="notes" value="" />
               <button className="primary-button" type="submit">
                 Add contact
               </button>
