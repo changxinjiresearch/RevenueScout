@@ -540,6 +540,38 @@ export default async function Home() {
                   </div>
                 ) : null}
 
+                {opportunity.m4 ? (
+                  <div className="decision-context m4-today-context">
+                    <span>
+                      Stage:{" "}
+                      <strong>
+                        {opportunity.m4.stage
+                          .toLowerCase()
+                          .split("_")
+                          .map(
+                            (part) =>
+                              part.charAt(0).toUpperCase() + part.slice(1),
+                          )
+                          .join(" ")}
+                      </strong>
+                    </span>
+                    <span>
+                      Owner:{" "}
+                      <strong>{opportunity.m4.ownerName ?? "Unassigned"}</strong>
+                    </span>
+                    <span>
+                      Last contact:{" "}
+                      <strong>
+                        {opportunity.m4.lastContactAt
+                          ? new Date(
+                              opportunity.m4.lastContactAt,
+                            ).toLocaleDateString("en-AU")
+                          : "None"}
+                      </strong>
+                    </span>
+                  </div>
+                ) : null}
+
                 <div className="explanation-grid">
                   <div>
                     <span className="field-label">Why this company</span>
