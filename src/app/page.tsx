@@ -774,6 +774,40 @@ export default async function Home({
                   </strong>
                   <span>Best person: {opportunity.recommendedContact}</span>
                 </div>
+
+                {user ? (
+                  <div className="m5-feedback-row">
+                    <form action="/api/feedback" method="post">
+                      <input type="hidden" name="companyId" value={opportunity.id} />
+                      <input type="hidden" name="useful" value="true" />
+                      <input type="hidden" name="returnTo" value="/" />
+                      <button className="text-button" type="submit">
+                        👍 Useful
+                      </button>
+                    </form>
+                    <details>
+                      <summary>👎 Not useful</summary>
+                      <form className="m5-feedback-form" action="/api/feedback" method="post">
+                        <input type="hidden" name="companyId" value={opportunity.id} />
+                        <input type="hidden" name="useful" value="false" />
+                        <input type="hidden" name="returnTo" value="/" />
+                        <select name="reason" defaultValue="WRONG_TIMING" required>
+                          <option value="WRONG_COMPANY">Wrong company</option>
+                          <option value="WRONG_TIMING">Wrong timing</option>
+                          <option value="WRONG_SIGNAL">Wrong signal</option>
+                          <option value="WRONG_OFFERING">Wrong Offering</option>
+                          <option value="TOO_SMALL">Too small</option>
+                          <option value="TOO_LARGE">Too large</option>
+                          <option value="ALREADY_CONTACTED">Already contacted</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                        <button className="secondary-button" type="submit">
+                          Submit
+                        </button>
+                      </form>
+                    </details>
+                  </div>
+                ) : null}
               </div>
 
               <aside className="score-column">
