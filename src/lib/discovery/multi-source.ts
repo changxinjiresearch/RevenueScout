@@ -471,39 +471,42 @@ export async function searchMultiSource(
     (candidate) => addOfficialWebsiteEvidence(candidate, semantics),
   );
 
-  return enriched
-    .map((candidate) => {
-      const validation = validationFor(candidate, query.query);
-      if (!validation) return null;
+  const validated: DiscoveryCandidate[] = [];
 
-      const sourceEvidence = candidate.sourceEvidence ?? [];
-      const primarySource =
-        sourceEvidence.find((item) => item.provider === "GLEIF") ??
-        sourceEvidence.find((item) => item.provider === "WIKIDATA") ??
-        sourceEvidence[0];
+  for (const candidate of enriched) {
+    const validation = validationFor(candidate, query.query);
+    if (!validation) continue;
 
-      return {
-        ...candidate,
-        provider: "MULTI_SOURCE" as const,
-        providerRecordId: canonicalRecordId(candidate),
-        industry: canonicalIndustryLabel(query.query),
-        sourceUrl: primarySource?.sourceUrl ?? candidate.sourceUrl,
-        sourceLabel: "Multi-source semantic validation",
-        sourceConfidence: validation.confidence,
-        verificationStatus:
-          validation.status === "CONFIRMED" ? "CONFIRMED" : "LIKELY",
-        industryValidation: validation,
-        matchedSemantics: validation.matchedSemantics,
-      };
-    })
-    .filter((candidate): candidate is DiscoveryCandidate => candidate !== null)
-    .sort((a, b) => {
-      const confidenceDelta =
-        (b.industryValidation?.confidence ?? 0) -
-        (a.industryValidation?.confidence ?? 0);
-      if (confidenceDelta !== 0) return confidenceDelta;
-      return a.displayName.localeCompare(b.displayName);
+    const sourceEvidence = candidate.sourceEvidence ?? [];
+    const primarySource =
+      sourceEvidence.find((item) => item.provider === "GLEIF") ??
+      sourceEvidence.find((item) => item.provider === "WIKIDATA") ??
+      sourceEvidence[0];
+
+    const verificationStatus: DiscoveryCandidate["verificationStatus"] =
+      validation.status === "CONFIRMED" ? "CONFIRMED" : "LIKELY";
+
+    validated.push({
+      ...candidate,
+      provider: "MULTI_SOURCE",
+      providerRecordId: canonicalRecordId(candidate),
+      industry: canonicalIndustryLabel(query.query),
+      sourceUrl: primarySource?.sourceUrl ?? candidate.sourceUrl,
+      sourceLabel: "Multi-source semantic validation",
+      sourceConfidence: validation.confidence,
+      verificationStatus,
+      industryValidation: validation,
+      matchedSemantics: validation.matchedSemantics,
     });
+  }
+
+  return validated.sort((a, b) => {
+    const confidenceDelta =
+      (b.industryValidation?.confidence ?? 0) -
+      (a.industryValidation?.confidence ?? 0);
+    if (confidenceDelta !== 0) return confidenceDelta;
+    return a.displayName.localeCompare(b.displayName);
+  });
 }
 
 export const multiSourceProvider: DiscoveryProvider = {
