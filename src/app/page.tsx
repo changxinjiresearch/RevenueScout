@@ -776,7 +776,37 @@ export default async function Home({
                 </div>
 
                 {user ? (
-                  <div className="m5-feedback-row">
+                  <div className="m5-card-action-area">
+                    <div className="m5-card-actions">
+                      {opportunity.m4?.ownerUserId !== user.id ? (
+                        <form
+                          action={`/api/companies/${opportunity.id}/assign-self`}
+                          method="post"
+                        >
+                          <input type="hidden" name="returnTo" value="/" />
+                          <button className="text-button" type="submit">
+                            Assign to me
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="m5-inline-state">Mine</span>
+                      )}
+                      <form
+                        action={`/api/companies/${opportunity.id}/watchlist`}
+                        method="post"
+                      >
+                        <input
+                          type="hidden"
+                          name="action"
+                          value={opportunity.m4?.watched ? "remove" : "add"}
+                        />
+                        <input type="hidden" name="returnTo" value="/" />
+                        <button className="text-button" type="submit">
+                          {opportunity.m4?.watched ? "Stop watching" : "Watch"}
+                        </button>
+                      </form>
+                    </div>
+                    <div className="m5-feedback-row">
                     <form action="/api/feedback" method="post">
                       <input type="hidden" name="companyId" value={opportunity.id} />
                       <input type="hidden" name="useful" value="true" />
@@ -806,6 +836,7 @@ export default async function Home({
                         </button>
                       </form>
                     </details>
+                    </div>
                   </div>
                 ) : null}
               </div>
