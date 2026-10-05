@@ -329,7 +329,8 @@ export async function addOfficialWebsiteEvidence(
       website: candidate.website,
       domain: candidate.domain,
       maxPages: 3,
-      allowDomainGuess: false,
+      allowDomainGuess: true,
+      maxDomainGuesses: 2,
     });
 
     if (!collected.officialWebsite || collected.pages.length === 0) {
@@ -388,35 +389,56 @@ export function industryValidationForCandidate(
   candidate: DiscoveryCandidate,
   query: string,
 ): DiscoveryIndustryValidation | null {
-  const supporting = (candidate.sourceEvidence ?? []).filter(
-    (item) => item.supportsIndustry,
+  const evidence = candidate.sourceEvidence ?? [];
+  const allFamilies = new Set(evidence.map((item) => item.sourceFamily));
+  const supporting = evidence.filter((item) => item.supportsIndustry);
+  const industryFamilies = new Set(
+    supporting.map((item) => item.sourceFamily),
   );
-  const families = new Set(supporting.map((item) => item.sourceFamily));
-  if (families.size < 2) return null;
+
+  // A candidate must still be multi-source overall, but one strong industry
+  // source (typically the verified official site) can establish a supported
+  // industry classification when a separate source independently verifies the
+  // company identity. Two independent industry sources are stronger and are
+  // reported separately as corroborated.
+  if (allFamilies.size < 2 || industryFamilies.size < 1) return null;
 
   const matched = mergeStringArrays(
     candidate.matchedSemantics,
     supporting.flatMap((item) => item.matchedSemantics),
   );
 
-  const avgConfidence =
+  const avgIndustryConfidence =
     supporting.reduce((sum, item) => sum + item.confidence, 0) /
     Math.max(1, supporting.length);
+  const identityConfidence = Math.max(
+    0,
+    ...evidence
+      .filter((item) => !item.supportsIndustry)
+      .map((item) => item.confidence),
+  );
+
   const confidence = Math.min(
     0.97,
     Math.max(
-      0.7,
-      avgConfidence * 0.78 +
-        Math.min(0.14, families.size * 0.04) +
-        Math.min(0.08, matched.length * 0.015),
+      0.68,
+      avgIndustryConfidence * 0.72 +
+        identityConfidence * 0.12 +
+        Math.min(0.08, allFamilies.size * 0.02) +
+        Math.min(0.08, matched.length * 0.012),
     ),
   );
 
   return {
     query,
-    status: families.size >= 3 ? "CONFIRMED" : "CORROBORATED",
+    status:
+      industryFamilies.size >= 3
+        ? "CONFIRMED"
+        : industryFamilies.size >= 2
+          ? "CORROBORATED"
+          : "SUPPORTED",
     confidence,
-    independentSupportingFamilyCount: families.size,
+    independentSupportingFamilyCount: industryFamilies.size,
     matchedSemantics: matched,
   };
 }
