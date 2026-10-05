@@ -70,6 +70,21 @@ export async function POST(request: NextRequest) {
 
   await sql.begin(async (tx) => {
     if (action === "clear") {
+      const [activeSuppression] = await tx<
+        { previousLifecycleStage: string | null }[]
+      >`
+        SELECT previous_lifecycle_stage AS "previousLifecycleStage"
+        FROM suppression_entries
+        WHERE organization_id = ${user.organizationId}
+          AND active = TRUE
+          AND (
+            (${scope} = 'COMPANY' AND company_id = ${companyId}) OR
+            (${scope} = 'CONTACT' AND contact_id = ${contactId})
+          )
+        ORDER BY created_at DESC
+        LIMIT 1
+      `;
+
       await tx`
         UPDATE suppression_entries
         SET
@@ -101,7 +116,10 @@ export async function POST(request: NextRequest) {
         await tx`
           UPDATE company_sales_lifecycle
           SET
-            stage = 'DISCOVERED',
+            stage = COALESCE(
+              ${activeSuppression?.previousLifecycleStage ?? null},
+              'DISCOVERED'
+            ),
             stage_changed_at = NOW(),
             updated_by = ${user.id},
             updated_at = NOW()
@@ -128,6 +146,7 @@ export async function POST(request: NextRequest) {
           reason,
           source,
           note,
+          previous_lifecycle_stage,
           active,
           created_by
         )
@@ -139,6 +158,15 @@ export async function POST(request: NextRequest) {
           ${reason},
           'USER',
           ${note},
+          ${scope === "COMPANY"
+            ? sql`
+                (SELECT stage
+                 FROM company_sales_lifecycle
+                 WHERE organization_id = ${user.organizationId}
+                   AND company_id = ${companyId}
+                 LIMIT 1)
+              `
+            : null},
           TRUE,
           ${user.id}
         )
