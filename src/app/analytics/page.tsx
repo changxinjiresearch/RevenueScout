@@ -81,6 +81,25 @@ type AttributionRow = {
   revenue: number;
 };
 
+type AttributionSummaryRow = {
+  attributedRevenue: number;
+  totalWonRevenue: number;
+  winsWithPrediction: number;
+  totalWins: number;
+};
+
+type TopOpportunityRow = {
+  companyId: string;
+  companyName: string;
+  stage: string;
+  ownerName: string | null;
+  matchedIcpName: string | null;
+  offeringName: string | null;
+  dealValue: number;
+  conversionProbability: number;
+  expectedRevenue: number;
+};
+
 type ClosedDealRow = {
   companyId: string;
   companyName: string;
@@ -171,6 +190,9 @@ export default async function AnalyticsPage({
     feedbackRows,
     feedbackReasons,
     attributionRows,
+    attributionSummaryRows,
+    topRevenueRows,
+    topProbabilityRows,
     closedDeals,
     monthlyRows,
   ] = await Promise.all([
@@ -269,6 +291,7 @@ export default async function AnalyticsPage({
       WHERE COALESCE(l.stage, 'DISCOVERED') NOT IN (
         'WON','LOST','NOT_FIT','DO_NOT_CONTACT','SUPPRESSED'
       )
+        AND COALESCE(ov.priority_override, 'AUTO') <> 'HOLD'
         AND NOT EXISTS (
           SELECT 1
           FROM suppression_entries s
@@ -527,6 +550,153 @@ export default async function AnalyticsPage({
       GROUP BY c.source_origin
       ORDER BY revenue DESC, wins DESC
     `,
+    sql<AttributionSummaryRow[]>`
+      SELECT
+        COALESCE(
+          SUM(o.actual_contract_value) FILTER (
+            WHERE o.outcome = 'WON'
+              AND o.opportunity_snapshot_id IS NOT NULL
+          ),
+          0
+        )::float8 AS "attributedRevenue",
+        COALESCE(
+          SUM(o.actual_contract_value) FILTER (WHERE o.outcome = 'WON'),
+          0
+        )::float8 AS "totalWonRevenue",
+        COUNT(*) FILTER (
+          WHERE o.outcome = 'WON'
+            AND o.opportunity_snapshot_id IS NOT NULL
+        )::int AS "winsWithPrediction",
+        COUNT(*) FILTER (WHERE o.outcome = 'WON')::int AS "totalWins"
+      FROM sales_outcomes o
+      WHERE o.organization_id = ${user.organizationId}
+        AND (
+          ${startIso}::timestamptz IS NULL OR
+          o.closed_at >= ${startIso}::timestamptz
+        )
+    `,
+    sql<TopOpportunityRow[]>`
+      WITH latest AS (
+        SELECT DISTINCT ON (os.company_id)
+          os.company_id,
+          os.matched_icp_name,
+          os.offering_name,
+          os.deal_value_expected::float8 AS deal_value_expected,
+          os.conversion_probability::float8 AS conversion_probability
+        FROM opportunity_snapshots os
+        WHERE os.organization_id = ${user.organizationId}
+        ORDER BY os.company_id, os.created_at DESC
+      )
+      SELECT
+        c.id AS "companyId",
+        c.display_name AS "companyName",
+        COALESCE(l.stage, 'DISCOVERED') AS stage,
+        owner.name AS "ownerName",
+        latest.matched_icp_name AS "matchedIcpName",
+        latest.offering_name AS "offeringName",
+        COALESCE(
+          ov.expected_deal_value_override,
+          latest.deal_value_expected
+        )::float8 AS "dealValue",
+        COALESCE(
+          ov.conversion_probability_override,
+          latest.conversion_probability
+        )::float8 AS "conversionProbability",
+        (
+          COALESCE(ov.expected_deal_value_override, latest.deal_value_expected) *
+          COALESCE(
+            ov.conversion_probability_override,
+            latest.conversion_probability
+          )
+        )::float8 AS "expectedRevenue"
+      FROM latest
+      JOIN companies c
+        ON c.id = latest.company_id
+       AND c.organization_id = ${user.organizationId}
+      LEFT JOIN company_sales_lifecycle l
+        ON l.organization_id = c.organization_id
+       AND l.company_id = c.id
+      LEFT JOIN users owner ON owner.id = l.owner_user_id
+      LEFT JOIN opportunity_overrides ov
+        ON ov.organization_id = c.organization_id
+       AND ov.company_id = c.id
+      WHERE COALESCE(l.stage, 'DISCOVERED') NOT IN (
+        'WON','LOST','NOT_FIT','DO_NOT_CONTACT','SUPPRESSED'
+      )
+        AND COALESCE(ov.priority_override, 'AUTO') <> 'HOLD'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM suppression_entries s
+          WHERE s.organization_id = c.organization_id
+            AND s.company_id = c.id
+            AND s.scope = 'COMPANY'
+            AND s.active = TRUE
+            AND (s.expires_at IS NULL OR s.expires_at > NOW())
+        )
+      ORDER BY "expectedRevenue" DESC, "conversionProbability" DESC
+      LIMIT 8
+    `,
+    sql<TopOpportunityRow[]>`
+      WITH latest AS (
+        SELECT DISTINCT ON (os.company_id)
+          os.company_id,
+          os.matched_icp_name,
+          os.offering_name,
+          os.deal_value_expected::float8 AS deal_value_expected,
+          os.conversion_probability::float8 AS conversion_probability
+        FROM opportunity_snapshots os
+        WHERE os.organization_id = ${user.organizationId}
+        ORDER BY os.company_id, os.created_at DESC
+      )
+      SELECT
+        c.id AS "companyId",
+        c.display_name AS "companyName",
+        COALESCE(l.stage, 'DISCOVERED') AS stage,
+        owner.name AS "ownerName",
+        latest.matched_icp_name AS "matchedIcpName",
+        latest.offering_name AS "offeringName",
+        COALESCE(
+          ov.expected_deal_value_override,
+          latest.deal_value_expected
+        )::float8 AS "dealValue",
+        COALESCE(
+          ov.conversion_probability_override,
+          latest.conversion_probability
+        )::float8 AS "conversionProbability",
+        (
+          COALESCE(ov.expected_deal_value_override, latest.deal_value_expected) *
+          COALESCE(
+            ov.conversion_probability_override,
+            latest.conversion_probability
+          )
+        )::float8 AS "expectedRevenue"
+      FROM latest
+      JOIN companies c
+        ON c.id = latest.company_id
+       AND c.organization_id = ${user.organizationId}
+      LEFT JOIN company_sales_lifecycle l
+        ON l.organization_id = c.organization_id
+       AND l.company_id = c.id
+      LEFT JOIN users owner ON owner.id = l.owner_user_id
+      LEFT JOIN opportunity_overrides ov
+        ON ov.organization_id = c.organization_id
+       AND ov.company_id = c.id
+      WHERE COALESCE(l.stage, 'DISCOVERED') NOT IN (
+        'WON','LOST','NOT_FIT','DO_NOT_CONTACT','SUPPRESSED'
+      )
+        AND COALESCE(ov.priority_override, 'AUTO') <> 'HOLD'
+        AND NOT EXISTS (
+          SELECT 1
+          FROM suppression_entries s
+          WHERE s.organization_id = c.organization_id
+            AND s.company_id = c.id
+            AND s.scope = 'COMPANY'
+            AND s.active = TRUE
+            AND (s.expires_at IS NULL OR s.expires_at > NOW())
+        )
+      ORDER BY "conversionProbability" DESC, "expectedRevenue" DESC
+      LIMIT 8
+    `,
     sql<ClosedDealRow[]>`
       SELECT
         c.id AS "companyId",
@@ -612,12 +782,14 @@ export default async function AnalyticsPage({
   const revenueComparison = revenueAccuracy(closedPredictionRows);
   const feedback = feedbackRows[0] ?? { useful: 0, notUseful: 0 };
   const feedbackTotal = feedback.useful + feedback.notUseful;
-  const attributedRevenue = closedDeals
-    .filter((deal) => deal.outcome === "WON" && deal.predictedExpectedRevenue !== null)
-    .reduce((sum, deal) => sum + (deal.actualContractValue ?? 0), 0);
-  const totalWonRevenue = closedDeals
-    .filter((deal) => deal.outcome === "WON")
-    .reduce((sum, deal) => sum + (deal.actualContractValue ?? 0), 0);
+  const attributionSummary = attributionSummaryRows[0] ?? {
+    attributedRevenue: 0,
+    totalWonRevenue: 0,
+    winsWithPrediction: 0,
+    totalWins: 0,
+  };
+  const attributedRevenue = attributionSummary.attributedRevenue;
+  const totalWonRevenue = attributionSummary.totalWonRevenue;
   const attributedCoverage =
     totalWonRevenue > 0 ? attributedRevenue / totalWonRevenue : null;
 
