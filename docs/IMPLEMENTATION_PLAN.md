@@ -135,18 +135,25 @@ from research work instead of treating sparse public data as negative evidence.
 
 ## M3 — Opportunity intelligence
 
-- persisted score snapshots
+Status: **completed**
+
+- immutable persisted score snapshots keyed by configuration/input state
+- historical snapshot view on the company page
 - Why this company
 - Why now
-- Problem Hypothesis
-- Recommended Offering
-- Estimated Deal Value
-- Conversion Probability
-- Expected Revenue
-- ranking
-- user override + audit marker
+- explicitly-labelled Problem Hypothesis
+- Recommended Offering from explicit ICP links, problem/need fit and deal economics
+- Low / Expected / High Estimated Deal Value
+- explainable pre-calibration Conversion Probability
+- Low / Expected / High probability-adjusted Expected Revenue
+- estimated Sales Effort and Revenue Efficiency
+- persisted M3 ranking on Today
+- human priority / probability / deal-value / Offering / next-action overrides
+- append-only audit trail for snapshot creation and override changes
+- unknown ICP dimensions remain unknown instead of becoming negative evidence
+- canonical geography matching is retained in opportunity qualification
 
-Exit gate: the product can rank and explain opportunities using persisted data.
+Exit gate: **passed**. Persisted company evidence and GTM configuration produce an explainable, probability-adjusted, ranked revenue opportunity with historical snapshots, human overrides and an audit trail.
 
 ## M4 — Contacts and sales lifecycle
 
