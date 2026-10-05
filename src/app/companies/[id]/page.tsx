@@ -1933,8 +1933,9 @@ export default async function CompanyIntelligencePage({
                 <input name="nextActionAt" type="datetime-local" />
               </label>
               <div className="m4-compliance-note">
-                Outbound activity is blocked for contacts marked Uncertain,
-                Do Not Contact or Unsubscribed.
+                Outbound activity is allowed only for Contact Permitted,
+                Existing Relationship or User-confirmed Consent. A public
+                business address alone is not treated as permission.
               </div>
               <button className="primary-button" type="submit">
                 Record activity
