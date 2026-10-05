@@ -377,8 +377,8 @@ export default async function Home() {
   function overrideOrder(item: TodayItem): number {
     const priority = item.m3?.override?.priorityOverride ?? "AUTO";
     if (priority === "HIGH") return 5;
-    if (priority === "AUTO") return 4;
-    if (priority === "MEDIUM") return 3;
+    if (priority === "MEDIUM") return 4;
+    if (priority === "AUTO") return 3;
     if (priority === "LOW") return 2;
     return 1;
   }
@@ -448,7 +448,7 @@ export default async function Home() {
         </div>
         <p>
           {user
-            ? `Ranked from ${storedCompanyCount} persisted company records. Completed Intelligence Engine v2 analyses use Sales Priority, while unanalysed records fall back to the legacy opportunity score.`
+            ? `Ranked from ${storedCompanyCount} persisted company records using M3 Expected Revenue, sales effort, confidence, M2 Sales Priority and any explicit human priority override.`
             : "This is synthetic demo data. Sign in to use persisted companies and traceable evidence."}
         </p>
       </section>
@@ -707,7 +707,7 @@ export default async function Home() {
 
       <footer className="disclaimer">
         {user
-          ? "Today separates Sales Priority from Research Priority. Intelligence Engine v2 treats missing data as unknown, validates commercial claims across independent source families, and keeps conversion estimates explicitly pre-calibration until real Won/Lost outcomes are available."
+          ? "Today combines M2 evidence intelligence with persisted M3 revenue opportunities. Missing data stays unknown, conversion estimates remain explicitly pre-calibration until real Won/Lost outcomes exist, and human overrides remain separate from the model snapshot."
           : "Demo mode uses synthetic fixtures only. No demo company should be interpreted as a real discovered business."}
       </footer>
     </main>
