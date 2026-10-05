@@ -149,17 +149,17 @@ export function companyFactsFromRecord(
 ): CandidateCompanyFacts {
   const year = now.getUTCFullYear();
   return {
-    country: company.country ?? "",
-    state: company.state ?? "",
-    city: company.city ?? "",
-    industry: company.industry ?? "",
-    subindustry: company.subindustry ?? "",
-    employeeCount: company.employeeCount ?? 0,
+    country: company.country,
+    state: company.state,
+    city: company.city,
+    industry: company.industry,
+    subindustry: company.subindustry,
+    employeeCount: company.employeeCount,
     companyAgeYears:
       company.foundedYear && company.foundedYear <= year
         ? year - company.foundedYear
-        : 0,
-    companyType: company.companyType ?? "",
+        : null,
+    companyType: company.companyType,
     serviceRegions: company.serviceRegions,
     fastGrowth: company.fastGrowth || recentSignal(signals, "GROWTH", 180, now),
     multiLocation:
