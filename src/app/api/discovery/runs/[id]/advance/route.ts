@@ -3,6 +3,7 @@ import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { jsonArrayValue } from "@/lib/db/json-value";
 import { searchGleif } from "@/lib/discovery/gleif";
+import { addAustralianIndustryDirectoryEvidence } from "@/lib/discovery/industry-directories";
 import {
   addOfficialWebsiteEvidence,
   candidateWithEvidence,
@@ -245,9 +246,18 @@ async function advanceValidation(
     ),
   );
 
-  const enriched = await Promise.all(
+  const withOfficialWebsite = await Promise.all(
     withWikidata.map((candidate) =>
       addOfficialWebsiteEvidence(candidate, state.semantics),
+    ),
+  );
+
+  const enriched = await Promise.all(
+    withOfficialWebsite.map((candidate) =>
+      addAustralianIndustryDirectoryEvidence(
+        candidate,
+        state.semantics,
+      ),
     ),
   );
 
