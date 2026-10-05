@@ -356,7 +356,7 @@ export default async function CompanyIntelligencePage({
 
   const [opportunityOverride, auditEvents] = opportunitySnapshot
     ? await Promise.all([
-        sql<OpportunityOverride[]>\`
+        sql<OpportunityOverride[]>`
           SELECT
             company_id AS "companyId",
             priority_override AS "priorityOverride",
@@ -367,11 +367,11 @@ export default async function CompanyIntelligencePage({
             note,
             updated_at AS "updatedAt"
           FROM opportunity_overrides
-          WHERE organization_id = \${user.organizationId}
-            AND company_id = \${id}
+          WHERE organization_id = ${user.organizationId}
+            AND company_id = ${id}
           LIMIT 1
-        \`,
-        sql<AuditEvent[]>\`
+        `,
+        sql<AuditEvent[]>`
           SELECT
             a.id,
             a.event_type AS "eventType",
@@ -380,11 +380,11 @@ export default async function CompanyIntelligencePage({
             a.created_at AS "createdAt"
           FROM opportunity_audit_events a
           LEFT JOIN users u ON u.id = a.actor_id
-          WHERE a.organization_id = \${user.organizationId}
-            AND a.company_id = \${id}
+          WHERE a.organization_id = ${user.organizationId}
+            AND a.company_id = ${id}
           ORDER BY a.created_at DESC
           LIMIT 8
-        \`,
+        `,
       ])
     : [null, [] as AuditEvent[]];
 
