@@ -414,7 +414,7 @@ export async function POST(
             "Company source: " +
             company.sourceOrigin +
             (predictionSnapshot
-              ? "; M3 model: " + latestSnapshot.modelVersion
+              ? "; M3 model: " + predictionSnapshot.modelVersion
               : "; no M3 snapshot available")
           },
           ${JSON.stringify(keySignals.map((signal) => signal.id))}::text::jsonb,
