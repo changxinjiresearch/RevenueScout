@@ -261,6 +261,12 @@ export default async function CompanyIntelligencePage({
     contact?: string;
     activity?: string;
     lifecycle?: string;
+    watchlist?: string;
+    assigned?: string;
+    feedback?: string;
+    suppression?: string;
+    consent?: string;
+    outreach_warning?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -683,6 +689,56 @@ export default async function CompanyIntelligencePage({
   );
   const recommendedContactRecord =
     contacts.find((contact) => contact.id === recommendedContact.contactId) ?? null;
+  const [watchEntry, activeCompanySuppression, duplicateContact] =
+    await Promise.all([
+      sql<{ reason: string }[]>`
+        SELECT reason
+        FROM watchlist_entries
+        WHERE organization_id = ${user.organizationId}
+          AND company_id = ${id}
+        LIMIT 1
+      `,
+      sql<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
+        FROM suppression_entries
+        WHERE organization_id = ${user.organizationId}
+          AND company_id = ${id}
+          AND scope = 'COMPANY'
+          AND active = TRUE
+          AND (expires_at IS NULL OR expires_at > NOW())
+      `,
+      recommendedContactRecord
+        ? sql<{ actorName: string | null; createdAt: Date }[]>`
+            SELECT
+              u.name AS "actorName",
+              a.created_at AS "createdAt"
+            FROM sales_activities a
+            JOIN contact_frequency_policies p
+              ON p.organization_id = a.organization_id
+            LEFT JOIN users u ON u.id = a.actor_id
+            WHERE a.organization_id = ${user.organizationId}
+              AND a.contact_id = ${recommendedContactRecord.id}
+              AND a.direction = 'OUTBOUND'
+              AND a.activity_status NOT IN ('PLANNED','CANCELLED')
+              AND a.actor_id IS DISTINCT FROM ${user.id}
+              AND a.created_at >=
+                NOW() - (p.duplicate_warning_hours || ' hours')::interval
+            ORDER BY a.created_at DESC
+            LIMIT 1
+          `
+        : Promise.resolve([] as { actorName: string | null; createdAt: Date }[]),
+    ]);
+
+  const isWatched = Boolean(watchEntry);
+  const companySuppressed = (activeCompanySuppression[0]?.count ?? 0) > 0;
+  const duplicateContactWarning = duplicateContact[0] ?? null;
+  const recommendedContactCanOutbound =
+    recommendedContactRecord !== null &&
+    ["CONTACT_PERMITTED", "EXISTING_RELATIONSHIP", "USER_CONFIRMED_CONSENT"].includes(
+      recommendedContactRecord.contactabilityStatus,
+    ) &&
+    !companySuppressed;
+
   const predictionDelta = salesOutcome
     ? predictionRealityDelta({
         predictedDealValue: salesOutcome.predictedDealValue,
@@ -822,6 +878,24 @@ export default async function CompanyIntelligencePage({
         <div className="success-banner">
           Final sales outcome saved with prediction-vs-reality data.
         </div>
+      ) : null}
+      {query.watchlist ? (
+        <div className="success-banner">Watchlist updated.</div>
+      ) : null}
+      {query.assigned ? (
+        <div className="success-banner">Opportunity assigned to you.</div>
+      ) : null}
+      {query.feedback ? (
+        <div className="success-banner">Recommendation feedback recorded.</div>
+      ) : null}
+      {query.suppression ? (
+        <div className="success-banner">Suppression status updated.</div>
+      ) : null}
+      {query.consent ? (
+        <div className="success-banner">Contact permission record saved.</div>
+      ) : null}
+      {query.outreach_warning ? (
+        <div className="warning-banner">{query.outreach_warning}</div>
       ) : null}
 
       <section className="ai-research-card">
