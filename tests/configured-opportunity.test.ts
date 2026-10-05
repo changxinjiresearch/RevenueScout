@@ -112,6 +112,27 @@ describe("ICP and Offering configuration", () => {
     expect(result.score).toBeGreaterThan(0);
   });
 
+  it("does not lower ICP Fit merely because a soft preference is unobserved", () => {
+    const withoutObservedGrowth = evaluateIcp(
+      {
+        ...company,
+        fastGrowth: false,
+        multiLocation: false,
+      },
+      {
+        ...icp,
+        fastGrowth: true,
+        multiLocation: true,
+      },
+    );
+
+    expect(withoutObservedGrowth.qualified).toBe(true);
+    expect(withoutObservedGrowth.score).toBe(100);
+    expect(withoutObservedGrowth.mismatches).toContain(
+      "Rapid growth not observed",
+    );
+  });
+
   it("enforces hard exclusions before ranking", () => {
     const result = evaluateIcp({ ...company, existingCustomer: true }, icp);
     expect(result.excluded).toBe(true);
