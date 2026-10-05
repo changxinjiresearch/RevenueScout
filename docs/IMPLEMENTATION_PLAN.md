@@ -157,18 +157,28 @@ Exit gate: **passed**. Persisted company evidence and GTM configuration produce 
 
 ## M4 — Contacts and sales lifecycle
 
-- Contact
-- Recommended Contact
-- contactability/compliance status
-- lifecycle stages
-- contact records
-- owner
-- Won/Lost
-- Lost Reason
-- actual contract value
-- prediction-vs-reality snapshot
+Status: **completed**
 
-Exit gate: RevenueScout can follow a recommendation through to a real outcome.
+- persistent Contact records with Name, Position, Email, Phone, LinkedIn, Location, decision relevance, source, confidence and verification
+- Recommended Contact resolved from the M3 role target using title fit, decision relevance, contactability and evidence quality
+- explicit Why This Person explanation
+- contactability / compliance states
+- outbound activity allowed only for explicit Contact Permitted, Existing Relationship or User-confirmed Consent states; a public business address alone is not treated as permission
+- opportunity owner assignment to workspace members
+- complete lifecycle stages: Discovered, Qualified, Ready to Contact, Contacted, Replied, Meeting, Opportunity, Proposal, Won, Lost, Not Fit, Do Not Contact and Suppressed
+- structured activity records for Outreach, Follow-up, Reply, Meeting, Proposal and internal Notes
+- Follow-up 1 / Follow-up 2 / Final follow-up sequence recording
+- activity-driven forward lifecycle advancement without automatic regression
+- primary contact, current Offering, next action, next-action date and shared sales notes
+- Won requires actual contract value
+- Lost requires a structured Lost Reason
+- actual Offering, primary contact, closed date and sales-cycle duration captured in outcomes
+- latest M3 Opportunity Score, Conversion Probability, Expected Deal Value and Expected Revenue frozen into the outcome record
+- Prediction vs Reality card on the company page
+- stage / owner / last-contact context shown on Today
+- company relationship state synchronised with lifecycle outcomes so existing ICP exclusions continue to work
+
+Exit gate: **passed**. A RevenueScout recommendation can be followed from a named contact and owner through recorded sales activity to Won/Lost ground truth, including actual contract value and prediction-vs-reality history.
 
 ## M5 — Today, search, watchlist and compliance
 

@@ -24,12 +24,104 @@ export async function POST(
   }
 
   const sql = db();
-  await sql`
-    UPDATE companies
-    SET relationship_status = ${status}, updated_at = NOW()
-    WHERE id = ${id}
-      AND organization_id = ${user.organizationId}
-  `;
+  await sql.begin(async (tx) => {
+    await tx`
+      UPDATE companies
+      SET relationship_status = ${status}, updated_at = NOW()
+      WHERE id = ${id}
+        AND organization_id = ${user.organizationId}
+    `;
+
+    if (action === "pipeline") {
+      await tx`
+        INSERT INTO company_sales_lifecycle (
+          organization_id,
+          company_id,
+          stage,
+          qualified_at,
+          origin_opportunity_snapshot_id,
+          origin_prediction_captured_at,
+          stage_changed_at,
+          updated_by,
+          updated_at
+        )
+        VALUES (
+          ${user.organizationId},
+          ${id},
+          'QUALIFIED',
+          NOW(),
+          (
+            SELECT id
+            FROM opportunity_snapshots
+            WHERE organization_id = ${user.organizationId}
+              AND company_id = ${id}
+            ORDER BY created_at DESC
+            LIMIT 1
+          ),
+          NOW(),
+          NOW(),
+          ${user.id},
+          NOW()
+        )
+        ON CONFLICT (organization_id, company_id)
+        DO UPDATE SET
+          stage = CASE
+            WHEN company_sales_lifecycle.stage = 'DISCOVERED'
+              THEN 'QUALIFIED'
+            ELSE company_sales_lifecycle.stage
+          END,
+          qualified_at = COALESCE(
+            company_sales_lifecycle.qualified_at,
+            NOW()
+          ),
+          origin_opportunity_snapshot_id = COALESCE(
+            company_sales_lifecycle.origin_opportunity_snapshot_id,
+            EXCLUDED.origin_opportunity_snapshot_id
+          ),
+          origin_prediction_captured_at = COALESCE(
+            company_sales_lifecycle.origin_prediction_captured_at,
+            EXCLUDED.origin_prediction_captured_at
+          ),
+          stage_changed_at = CASE
+            WHEN company_sales_lifecycle.stage = 'DISCOVERED'
+              THEN NOW()
+            ELSE company_sales_lifecycle.stage_changed_at
+          END,
+          updated_by = ${user.id},
+          updated_at = NOW()
+      `;
+    }
+
+    if (action === "reject") {
+      await tx`
+        INSERT INTO company_sales_lifecycle (
+          organization_id,
+          company_id,
+          stage,
+          closed_at,
+          stage_changed_at,
+          updated_by,
+          updated_at
+        )
+        VALUES (
+          ${user.organizationId},
+          ${id},
+          'NOT_FIT',
+          NOW(),
+          NOW(),
+          ${user.id},
+          NOW()
+        )
+        ON CONFLICT (organization_id, company_id)
+        DO UPDATE SET
+          stage = 'NOT_FIT',
+          closed_at = NOW(),
+          stage_changed_at = NOW(),
+          updated_by = ${user.id},
+          updated_at = NOW()
+      `;
+    }
+  });
 
   const url = publicUrl(request, `/companies/${id}`);
   url.searchParams.set("triaged", action);

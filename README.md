@@ -15,12 +15,13 @@ The frozen product specification and approved discovery amendment are stored at:
 - `docs/PRODUCT_SPEC_v1.4_ICP_GEOGRAPHY_AND_CORROBORATION.md`
 - `docs/PRODUCT_SPEC_v1.5_AU_LOGISTICS_SOURCE_EXPANSION.md`
 - `docs/PRODUCT_SPEC_v1.6_M3_OPPORTUNITY_INTELLIGENCE.md`
+- `docs/PRODUCT_SPEC_v1.7_M4_CONTACTS_SALES_LIFECYCLE.md`
 
 All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
 ## Current development status
 
-M0, M1, M2 and M3 are complete. M4 (Contacts and Sales Lifecycle) is the next formal milestone.
+M0, M1, M2, M3 and M4 are complete. M5 (Today, Search, Watchlist and Compliance) is the next formal milestone.
 
 The current application includes:
 
@@ -53,6 +54,17 @@ The current application includes:
 - M3 ranking on Today
 - human priority / probability / deal-value / Offering / next-action overrides
 - append-only opportunity decision audit trail and snapshot history
+- persistent multi-contact company records with provenance and confidence
+- deterministic Recommended Contact selection with a visible "Why this person?" rationale
+- contactability / compliance status with outbound activity allowed only for explicit Contact Permitted, Existing Relationship or User-confirmed Consent states
+- opportunity ownership across workspace members
+- complete Discovered → Qualified → Contacted → Replied → Meeting → Opportunity → Proposal → Won/Lost lifecycle
+- structured outreach, follow-up, reply, meeting, proposal and note activity records
+- lifecycle timestamps, primary contact, current Offering and next-action scheduling
+- Won outcomes with actual contract value and sales-cycle duration
+- structured Lost Reasons
+- M3 prediction-vs-reality ground-truth snapshots for future calibration
+- M4 stage / owner / last-contact context on Today
 
 The default Intelligence Engine path does not require a paid AI/model/search API.
 
