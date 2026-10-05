@@ -213,6 +213,7 @@ export function buildOpportunityIntelligence(input: {
   offerings: OfferingConfig[];
   signals: SignalRecord[];
   m2SalesPriorityScore?: number | null;
+  now?: Date;
 }): OpportunityIntelligence {
   const offering = selectedOffering(input.configured, input.offerings);
   const deal = dealValueRange(
@@ -226,7 +227,7 @@ export function buildOpportunityIntelligence(input: {
   const hasProcurementSignal = activeSignals.some(
     (signal) => signal.signalType === "PROCUREMENT",
   );
-  const now = Date.now();
+  const now = (input.now ?? new Date()).getTime();
   const hasRecentSignal = activeSignals.some((signal) => {
     const observed = new Date(signal.observedAt).getTime();
     if (!Number.isFinite(observed)) return false;
