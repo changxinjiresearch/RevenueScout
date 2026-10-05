@@ -182,15 +182,29 @@ Exit gate: **passed**. A RevenueScout recommendation can be followed from a name
 
 ## M5 — Today, search, watchlist and compliance
 
-- production Today page
-- filters/search/sort
-- watchlist
-- suppression list
-- Do Not Contact
-- duplicate-outreach guard
-- feedback
+Status: **completed**
 
-Exit gate: a salesperson can use RevenueScout as a daily work surface safely.
+- production Today work queue
+- Today views: All / Mine / Due / Unassigned / Watchlist
+- lifecycle-stage filtering and commercial sorting on Today
+- one-click assignment and Watchlist actions
+- low-friction company Quick Actions for Contacted, Follow-up, Reply, Meeting and Proposal
+- detailed M4 forms moved behind advanced disclosures
+- reduced new-contact entry to essential identity fields
+- workspace-wide search over Companies, Contacts, opportunity context, Notes, Industries and Locations
+- filters for Country, State, City, Industry, Size, Score, Signal, Expected Revenue, Stage, Owner, Last Contact, Last Signal, ICP, Offering and Watchlist
+- sort by Opportunity Score, Expected Revenue, Conversion Probability, Deal Value, Latest Signal and recency
+- Watchlist page with current score, revenue, probability, stage, owner, latest signal and Next Action
+- organisation-wide company/contact Suppression List
+- company-level Do Not Contact quick action
+- explicit permission / withdrawal records separate from discovered email addresses
+- server-side duplicate-outreach detection
+- configurable contact-level and company-level contact-frequency limits
+- suppressed companies hard-removed from Today sales and research recommendations
+- recommendation Useful / Not useful feedback with structured reasons
+- suppression preserves/restores the prior lifecycle and relationship state
+
+Exit gate: **passed**. A salesperson can use RevenueScout as a daily work surface with minimal manual entry while search, Watchlist, suppression, duplicate-outreach and contact-frequency controls are enforced server-side.
 
 ## M6 — Basic analytics
 
