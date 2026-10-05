@@ -47,6 +47,7 @@ type TodayLifecycle = {
   nextActionAt: Date | null;
   nextAction: string;
   watched: boolean;
+  suppressed: boolean;
 };
 
 type TodayItem = OpportunityInput & {
@@ -280,7 +281,16 @@ export default async function Home({
             l.last_contact_at AS "lastContactAt",
             l.next_action_at AS "nextActionAt",
             COALESCE(l.next_action, '') AS "nextAction",
-            (w.company_id IS NOT NULL) AS watched
+            (w.company_id IS NOT NULL) AS watched,
+            EXISTS (
+              SELECT 1
+              FROM suppression_entries s
+              WHERE s.organization_id = c.organization_id
+                AND s.company_id = c.id
+                AND s.scope = 'COMPANY'
+                AND s.active = TRUE
+                AND (s.expires_at IS NULL OR s.expires_at > NOW())
+            ) AS suppressed
           FROM companies c
           LEFT JOIN company_sales_lifecycle l
             ON l.organization_id = c.organization_id
@@ -305,8 +315,14 @@ export default async function Home({
     const lifecycleByCompany = new Map(
       lifecycleRows.map((lifecycle) => [lifecycle.companyId, lifecycle]),
     );
+    const suppressedCompanyIds = new Set(
+      lifecycleRows
+        .filter((lifecycle) => lifecycle.suppressed)
+        .map((lifecycle) => lifecycle.companyId),
+    );
 
     for (const company of companies) {
+      if (suppressedCompanyIds.has(company.id)) continue;
       const companyEvidence = evidence.filter(
         (item) => item.companyId === company.id,
       );
@@ -377,6 +393,7 @@ export default async function Home({
           run.upsideScore !== null &&
           run.valueOfInformationScore !== null &&
           run.priorityAction !== "REJECT" &&
+          !suppressedCompanyIds.has(run.companyId) &&
           (run.priorityAction === "INVESTIGATE_URGENTLY" ||
             run.priorityAction === "GATHER_MORE_DATA" ||
             (run.researchPriorityScore ?? 0) > (run.salesPriorityScore ?? 0) ||
