@@ -1599,6 +1599,24 @@ export default async function CompanyIntelligencePage({
               method="post"
             >
               <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="FOLLOW_UP" />
+              <input type="hidden" name="activityStatus" value="COMPLETED" />
+              <input type="hidden" name="followUpSequence" value="1" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactCanOutbound}
+              >
+                <span>Activity</span>
+                <strong>Followed up</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
               <input type="hidden" name="activityType" value="REPLY" />
               <input type="hidden" name="activityStatus" value="REPLIED" />
               <button
