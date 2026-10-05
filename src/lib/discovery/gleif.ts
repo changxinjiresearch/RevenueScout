@@ -167,9 +167,11 @@ export async function searchGleif(
   }
 
   const records: GleifRecord[] = [];
+  const seenPages = new Set<string>();
   let nextUrl: string | null = firstUrl.toString();
 
-  while (nextUrl) {
+  while (nextUrl && !seenPages.has(nextUrl)) {
+    seenPages.add(nextUrl);
     const response = await fetch(nextUrl, {
       headers: {
         Accept: "application/vnd.api+json",
