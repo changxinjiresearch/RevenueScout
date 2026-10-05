@@ -122,13 +122,14 @@ export default async function DiscoverPage({
       {params.error ? <div className="error-banner">{params.error}</div> : null}
 
       <section className="discovery-source-note">
-        <strong>Current live source: GLEIF.</strong>
+        <strong>Multi-source semantic discovery is active.</strong>
         <p>
-          GLEIF provides real Legal Entity Identifier reference data. It is
-          useful for legal-entity discovery and verification, but it is not a
-          comprehensive Australian SME directory and usually does not provide
-          employee count or industry. RevenueScout therefore marks those fields
-          as needing enrichment instead of inventing them.
+          RevenueScout expands the industry keyword into related business
+          semantics, searches independent public sources, merges duplicate
+          entities, and only returns companies whose industry relevance is
+          supported by at least two independent source families. There is no
+          fixed product-level result cap; provider pagination is exhausted and
+          all unique validated matches are retained.
         </p>
       </section>
 
@@ -140,7 +141,8 @@ export default async function DiscoverPage({
           </div>
           <p>
             The selected ICP and Offering are stored with the discovery run for
-            traceability. This first adapter searches legal names.
+            traceability. Industry discovery uses multiple semantic variants
+            rather than relying on a legal-name keyword alone.
           </p>
         </div>
 
@@ -224,7 +226,11 @@ export default async function DiscoverPage({
                   >
                     <div className="discovery-result-head">
                       <div>
-                        <span className="source-badge">{candidate.provider}</span>
+                        <span className="source-badge">
+                          {candidate.industryValidation
+                            ? `${candidate.industryValidation.independentSupportingFamilyCount} sources`
+                            : candidate.provider}
+                        </span>
                         <h3>{candidate.displayName}</h3>
                         <p>
                           {[candidate.city, candidate.state, candidate.country]
@@ -246,6 +252,14 @@ export default async function DiscoverPage({
                     <div className="discovery-precheck">
                       <strong>{precheck.headline}</strong>
                       <p>{precheck.reasons[0]}</p>
+                      {candidate.industryValidation ? (
+                        <p>
+                          Industry {candidate.industryValidation.status.toLowerCase()} ·{" "}
+                          {Math.round(candidate.industryValidation.confidence * 100)}%
+                          confidence · matched semantics:{" "}
+                          {candidate.industryValidation.matchedSemantics.join(", ")}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="discovery-data-grid">
