@@ -11,13 +11,22 @@ export async function POST(request: NextRequest) {
   const user = await requireUser();
   const formData = await request.formData();
   const runId = String(formData.get("runId") ?? "");
-  const candidateIndex = Number.parseInt(
+  const requestedIndex = Number.parseInt(
     String(formData.get("candidateIndex") ?? "-1"),
     10,
   );
+  const candidateKey =
+    String(formData.get("candidateKey") ?? "").trim() || null;
 
-  if (!runId || !Number.isInteger(candidateIndex) || candidateIndex < 0) {
-    return NextResponse.json({ error: "Invalid discovery import." }, { status: 400 });
+  if (
+    !runId ||
+    (!candidateKey &&
+      (!Number.isInteger(requestedIndex) || requestedIndex < 0))
+  ) {
+    return NextResponse.json(
+      { error: "Invalid discovery import." },
+      { status: 400 },
+    );
   }
 
   const sql = db();
@@ -26,7 +35,7 @@ export async function POST(request: NextRequest) {
     FROM discovery_runs
     WHERE id = ${runId}
       AND organization_id = ${user.organizationId}
-      AND status = 'COMPLETED'
+      AND status IN ('RUNNING', 'COMPLETED')
     LIMIT 1
   `;
 
@@ -35,6 +44,11 @@ export async function POST(request: NextRequest) {
   }
 
   const results = jsonArrayValue<DiscoveryCandidate>(run.results);
+  const candidateIndex = candidateKey
+    ? results.findIndex(
+        (item) => item.providerRecordId === candidateKey,
+      )
+    : requestedIndex;
   const candidate = results[candidateIndex];
   if (!candidate) {
     return NextResponse.json({ error: "Discovery candidate not found." }, { status: 404 });
