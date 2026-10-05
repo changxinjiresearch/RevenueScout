@@ -203,12 +203,15 @@ export function evaluateIcp(
     failure: string,
   ) => {
     if (!configured) return;
-    possible += weight;
 
     if (passed) {
+      possible += weight;
       earned += weight;
       reasons.push(success);
     } else {
+      // These booleans mean "not observed" in the persisted company record,
+      // not a verified negative fact. Keep the gap visible without lowering
+      // ICP Fit merely because public evidence is sparse.
       mismatches.push(failure);
     }
   };
