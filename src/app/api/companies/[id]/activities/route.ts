@@ -152,16 +152,20 @@ export async function POST(
   `;
 
   const currentStage: LifecycleStage = current?.stage ?? "DISCOVERED";
-  const suggested = recommendedStageForActivity(
-    activityType as
-      | "OUTREACH"
-      | "FOLLOW_UP"
-      | "REPLY"
-      | "MEETING"
-      | "PROPOSAL"
-      | "NOTE"
-      | "STAGE_CHANGE",
-  );
+  const isCompletedActivity =
+    activityStatus !== "PLANNED" && activityStatus !== "CANCELLED";
+  const suggested = isCompletedActivity
+    ? recommendedStageForActivity(
+        activityType as
+          | "OUTREACH"
+          | "FOLLOW_UP"
+          | "REPLY"
+          | "MEETING"
+          | "PROPOSAL"
+          | "NOTE"
+          | "STAGE_CHANGE",
+      )
+    : null;
   const nextStage =
     suggested && shouldAdvanceLifecycle(currentStage, suggested)
       ? suggested
@@ -224,11 +228,11 @@ export async function POST(
         ${nextStage},
         ${contactId},
         ${nextActionAt},
-        ${activityType === "OUTREACH" || activityType === "FOLLOW_UP" ? now : null},
-        ${direction === "OUTBOUND" ? now : null},
-        ${activityType === "REPLY" ? now : null},
-        ${activityType === "MEETING" ? now : null},
-        ${activityType === "PROPOSAL" ? now : null},
+        ${isCompletedActivity && (activityType === "OUTREACH" || activityType === "FOLLOW_UP") ? now : null},
+        ${isCompletedActivity && direction === "OUTBOUND" ? now : null},
+        ${isCompletedActivity && activityType === "REPLY" ? now : null},
+        ${isCompletedActivity && activityType === "MEETING" ? now : null},
+        ${isCompletedActivity && activityType === "PROPOSAL" ? now : null},
         NOW(),
         ${user.id},
         NOW()
