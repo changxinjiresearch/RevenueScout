@@ -3,13 +3,16 @@ import { requireUser } from "@/lib/auth/session";
 import { db } from "@/lib/db";
 import { publicUrl } from "@/lib/http/public-url";
 import {
-  canRecordOutboundContact,
   recommendedStageForActivity,
   relationshipStatusForStage,
   shouldAdvanceLifecycle,
   type ContactabilityStatus,
   type LifecycleStage,
 } from "@/lib/sales/lifecycle";
+import {
+  evaluateOutreachGuard,
+  type FrequencyPolicy,
+} from "@/lib/compliance/outreach";
 
 const ACTIVITY_TYPES = new Set([
   "OUTREACH",
@@ -136,18 +139,6 @@ export async function POST(
       return NextResponse.json({ error: "Contact not found." }, { status: 404 });
     }
 
-    if (
-      direction === "OUTBOUND" &&
-      !canRecordOutboundContact(contact.contactabilityStatus)
-    ) {
-      return NextResponse.json(
-        {
-          error:
-            "Outbound contact is blocked because this contact is uncertain, do-not-contact, or unsubscribed.",
-        },
-        { status: 409 },
-      );
-    }
   }
 
   const [current] = await sql<{ stage: LifecycleStage }[]>`
@@ -159,14 +150,106 @@ export async function POST(
   `;
 
   const currentStage: LifecycleStage = current?.stage ?? "DISCOVERED";
-  if (
-    direction === "OUTBOUND" &&
-    (currentStage === "DO_NOT_CONTACT" || currentStage === "SUPPRESSED")
-  ) {
-    return NextResponse.json(
-      { error: "Outbound contact is blocked by the company lifecycle status." },
-      { status: 409 },
-    );
+
+  let outreachWarning: string | null = null;
+
+  if (direction === "OUTBOUND" && contact) {
+    const [policyRows, companySuppressionRows, contactSuppressionRows, contactCountRows, companyCountRows, duplicateRows] =
+      await Promise.all([
+        sql<FrequencyPolicy[]>`
+          SELECT
+            contact_window_days AS "contactWindowDays",
+            max_contact_outbound AS "maxContactOutbound",
+            company_window_days AS "companyWindowDays",
+            max_company_outbound AS "maxCompanyOutbound",
+            duplicate_warning_hours AS "duplicateWarningHours"
+          FROM contact_frequency_policies
+          WHERE organization_id = ${user.organizationId}
+          LIMIT 1
+        `,
+        sql<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count
+          FROM suppression_entries
+          WHERE organization_id = ${user.organizationId}
+            AND company_id = ${companyId}
+            AND scope = 'COMPANY'
+            AND active = TRUE
+            AND (expires_at IS NULL OR expires_at > NOW())
+        `,
+        sql<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count
+          FROM suppression_entries
+          WHERE organization_id = ${user.organizationId}
+            AND contact_id = ${contact.id}
+            AND scope = 'CONTACT'
+            AND active = TRUE
+            AND (expires_at IS NULL OR expires_at > NOW())
+        `,
+        sql<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count
+          FROM sales_activities a
+          JOIN contact_frequency_policies p
+            ON p.organization_id = a.organization_id
+          WHERE a.organization_id = ${user.organizationId}
+            AND a.contact_id = ${contact.id}
+            AND a.direction = 'OUTBOUND'
+            AND a.activity_status NOT IN ('PLANNED','CANCELLED')
+            AND a.created_at >= NOW() - (p.contact_window_days || ' days')::interval
+        `,
+        sql<{ count: number }[]>`
+          SELECT COUNT(*)::int AS count
+          FROM sales_activities a
+          JOIN contact_frequency_policies p
+            ON p.organization_id = a.organization_id
+          WHERE a.organization_id = ${user.organizationId}
+            AND a.company_id = ${companyId}
+            AND a.direction = 'OUTBOUND'
+            AND a.activity_status NOT IN ('PLANNED','CANCELLED')
+            AND a.created_at >= NOW() - (p.company_window_days || ' days')::interval
+        `,
+        sql<{ createdAt: Date }[]>`
+          SELECT a.created_at AS "createdAt"
+          FROM sales_activities a
+          JOIN contact_frequency_policies p
+            ON p.organization_id = a.organization_id
+          WHERE a.organization_id = ${user.organizationId}
+            AND a.contact_id = ${contact.id}
+            AND a.direction = 'OUTBOUND'
+            AND a.activity_status NOT IN ('PLANNED','CANCELLED')
+            AND a.actor_id IS DISTINCT FROM ${user.id}
+            AND a.created_at >= NOW() - (p.duplicate_warning_hours || ' hours')::interval
+          ORDER BY a.created_at DESC
+          LIMIT 1
+        `,
+      ]);
+
+    const policy: FrequencyPolicy = policyRows[0] ?? {
+      contactWindowDays: 7,
+      maxContactOutbound: 2,
+      companyWindowDays: 14,
+      maxCompanyOutbound: 4,
+      duplicateWarningHours: 48,
+    };
+
+    const guard = evaluateOutreachGuard({
+      contactabilityStatus: contact.contactabilityStatus,
+      companyStage: currentStage,
+      activeCompanySuppression: (companySuppressionRows[0]?.count ?? 0) > 0,
+      activeContactSuppression: (contactSuppressionRows[0]?.count ?? 0) > 0,
+      contactOutboundCount: contactCountRows[0]?.count ?? 0,
+      companyOutboundCount: companyCountRows[0]?.count ?? 0,
+      lastOutboundByOtherUserAt: duplicateRows[0]?.createdAt ?? null,
+      policy,
+    });
+
+    if (!guard.allowed) {
+      return NextResponse.json(
+        { error: guard.blockers.join(" ") },
+        { status: 409 },
+      );
+    }
+
+    outreachWarning = guard.warnings[0] ?? null;
   }
 
   const isCompletedActivity =
@@ -323,5 +406,8 @@ export async function POST(
 
   const url = publicUrl(request, "/companies/" + companyId);
   url.searchParams.set("activity", "recorded");
+  if (outreachWarning) {
+    url.searchParams.set("outreach_warning", outreachWarning);
+  }
   return NextResponse.redirect(url, 303);
 }
