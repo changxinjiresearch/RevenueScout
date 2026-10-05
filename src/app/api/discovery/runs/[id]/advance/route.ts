@@ -102,9 +102,7 @@ async function advanceDiscovery(
     return {
       ...state,
       stage: "VALIDATION",
-      candidates: state.candidates
-        .filter((candidate) => hasIndustrySeed(candidate) && hasTrustedWebsite(candidate))
-        .sort(validationOrder),
+      candidates: [...state.candidates].sort(validationOrder),
       validationIndex: 0,
     };
   }
@@ -140,9 +138,7 @@ async function advanceDiscovery(
       ...state,
       stage: "VALIDATION",
       semanticIndex: nextIndex,
-      candidates: merged
-        .filter((candidate) => hasIndustrySeed(candidate) && hasTrustedWebsite(candidate))
-        .sort(validationOrder),
+      candidates: [...merged].sort(validationOrder),
       validationIndex: 0,
     };
   }
@@ -163,7 +159,7 @@ async function advanceValidation(
   state: ProgressiveDiscoveryWorkState;
   results: DiscoveryCandidate[];
 }> {
-  const batchSize = 6;
+  const batchSize = 4;
   const batch = state.candidates.slice(
     state.validationIndex,
     state.validationIndex + batchSize,

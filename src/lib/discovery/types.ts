@@ -19,7 +19,7 @@ export type DiscoveryEvidenceSource = {
 
 export type DiscoveryIndustryValidation = {
   query: string;
-  status: "CORROBORATED" | "CONFIRMED";
+  status: "SUPPORTED" | "CORROBORATED" | "CONFIRMED";
   confidence: number;
   independentSupportingFamilyCount: number;
   matchedSemantics: string[];
