@@ -87,7 +87,11 @@ export async function POST(
     (isQuick ? defaultChannel : "OTHER");
   const requestedDirection =
     clean(formData.get("direction")).toUpperCase() ||
-    (isQuick ? "OUTBOUND" : "INTERNAL");
+    (isQuick
+      ? activityType === "MEETING" || activityType === "NOTE"
+        ? "INTERNAL"
+        : "OUTBOUND"
+      : "INTERNAL");
   const direction =
     activityType === "REPLY"
       ? "INBOUND"
