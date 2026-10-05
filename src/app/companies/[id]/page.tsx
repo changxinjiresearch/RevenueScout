@@ -75,6 +75,16 @@ type AuditEvent = {
   createdAt: Date;
 };
 
+type SnapshotHistory = {
+  id: string;
+  configVersion: number;
+  opportunityScore: number;
+  expectedRevenue: number;
+  conversionProbability: number;
+  offeringName: string | null;
+  createdAt: Date;
+};
+
 type ResearchRun = {
   id: string;
   status: "RUNNING" | "COMPLETED" | "FAILED";
@@ -354,8 +364,9 @@ export default async function CompanyIntelligencePage({
     m2SalesPriorityScore: engineResult?.salesPriorityScore ?? null,
   });
 
-  const [opportunityOverrideRows, auditEvents] = opportunitySnapshot
-    ? await Promise.all([
+  const [opportunityOverrideRows, auditEvents, snapshotHistory] =
+    opportunitySnapshot
+      ? await Promise.all([
         sql<OpportunityOverride[]>`
           SELECT
             company_id AS "companyId",
@@ -385,8 +396,27 @@ export default async function CompanyIntelligencePage({
           ORDER BY a.created_at DESC
           LIMIT 8
         `,
+        sql<SnapshotHistory[]>`
+          SELECT
+            id,
+            config_version AS "configVersion",
+            opportunity_score AS "opportunityScore",
+            expected_revenue::float8 AS "expectedRevenue",
+            conversion_probability::float8 AS "conversionProbability",
+            offering_name AS "offeringName",
+            created_at AS "createdAt"
+          FROM opportunity_snapshots
+          WHERE organization_id = ${user.organizationId}
+            AND company_id = ${id}
+          ORDER BY created_at DESC
+          LIMIT 8
+        `,
       ])
-    : [[] as OpportunityOverride[], [] as AuditEvent[]];
+      : [
+          [] as OpportunityOverride[],
+          [] as AuditEvent[],
+          [] as SnapshotHistory[],
+        ];
 
   const opportunityOverride = opportunityOverrideRows[0] ?? null;
 
@@ -991,6 +1021,30 @@ export default async function CompanyIntelligencePage({
                 ) : null}
               </div>
             </form>
+          </details>
+
+          <details className="m3-audit-panel">
+            <summary>Score snapshot history ({snapshotHistory.length})</summary>
+            {snapshotHistory.length === 0 ? (
+              <p>No historical snapshots yet.</p>
+            ) : (
+              <div className="m3-audit-list">
+                {snapshotHistory.map((snapshot) => (
+                  <div key={snapshot.id}>
+                    <strong>
+                      Score {snapshot.opportunityScore} ·{" "}
+                      {money(snapshot.expectedRevenue)} expected revenue
+                    </strong>
+                    <span>
+                      {Math.round(snapshot.conversionProbability * 1000) / 10}%
+                      conversion · Config v{snapshot.configVersion} ·{" "}
+                      {new Date(snapshot.createdAt).toLocaleString("en-AU")}
+                    </span>
+                    <p>{snapshot.offeringName ?? "No linked Offering"}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </details>
 
           <details className="m3-audit-panel">
