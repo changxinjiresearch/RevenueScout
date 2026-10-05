@@ -104,6 +104,13 @@ export async function POST(
     | { id: string; contactabilityStatus: ContactabilityStatus }
     | null = null;
 
+  if (direction === "OUTBOUND" && !contactId) {
+    return NextResponse.json(
+      { error: "Outbound activity requires a named contact." },
+      { status: 400 },
+    );
+  }
+
   if (contactId) {
     [contact] = await sql<
       { id: string; contactabilityStatus: ContactabilityStatus }[]
