@@ -163,6 +163,46 @@ describe("ICP and Offering configuration", () => {
     expect(configured).toBeNull();
   });
 
+  it("prefers problem-fit Offering over a larger but less relevant contract", () => {
+    const configured = configureOpportunity(
+      base,
+      { ...company, digitalNeed: true, multiLocation: true },
+      [icp],
+      [
+        {
+          id: "offering-automation",
+          name: "Workflow Automation",
+          description: "Automate operations workflows and process coordination",
+          primaryProblems: "manual process coordination",
+          typicalCustomers: "multi-location logistics teams",
+          minContractValue: 12000,
+          avgContractValue: 25000,
+          idealContractValue: 40000,
+        },
+        {
+          id: "offering-website",
+          name: "Premium Website Rebuild",
+          description: "Marketing website design",
+          primaryProblems: "brand presentation",
+          typicalCustomers: "consumer brands",
+          minContractValue: 30000,
+          avgContractValue: 60000,
+          idealContractValue: 90000,
+        },
+      ],
+      [
+        { offeringId: "offering-automation", icpId: "icp-1" },
+        { offeringId: "offering-website", icpId: "icp-1" },
+      ],
+    );
+
+    expect(configured?.offeringId).toBe("offering-automation");
+    expect(configured?.opportunity.recommendedOffering).toBe(
+      "Workflow Automation",
+    );
+    expect(configured?.offeringReason.toLowerCase()).toContain("problem");
+  });
+
   it("uses linked Offering economics instead of demo deal value", () => {
     const configured = configureOpportunity(
       base,
