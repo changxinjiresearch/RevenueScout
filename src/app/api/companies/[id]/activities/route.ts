@@ -73,7 +73,14 @@ export async function POST(
   const contactId = clean(formData.get("contactId")) || null;
   const activityType = clean(formData.get("activityType")).toUpperCase();
   const channel = clean(formData.get("channel")).toUpperCase() || "OTHER";
-  const direction = clean(formData.get("direction")).toUpperCase() || "INTERNAL";
+  const requestedDirection =
+    clean(formData.get("direction")).toUpperCase() || "INTERNAL";
+  const direction =
+    activityType === "REPLY"
+      ? "INBOUND"
+      : activityType === "NOTE"
+        ? "INTERNAL"
+        : requestedDirection;
   const subject = clean(formData.get("subject")).slice(0, 500);
   const summary = clean(formData.get("summary")).slice(0, 5000);
   const activityStatus =
