@@ -1896,6 +1896,49 @@ export default async function CompanyIntelligencePage({
                     </a>
                   ) : null}
 
+                  <details className="m5-permission-record">
+                    <summary>Record permission / withdrawal</summary>
+                    <form
+                      className="m5-permission-form"
+                      action="/api/compliance/consent"
+                      method="post"
+                    >
+                      <input type="hidden" name="contactId" value={contact.id} />
+                      <input
+                        type="hidden"
+                        name="returnTo"
+                        value={`/companies/${id}`}
+                      />
+                      <label>
+                        Record
+                        <select name="consentType" defaultValue="CONTACT_PERMITTED">
+                          <option value="CONTACT_PERMITTED">Contact permitted</option>
+                          <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
+                          <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
+                          <option value="WITHDRAWN">Permission withdrawn / stop requested</option>
+                        </select>
+                      </label>
+                      <label>
+                        Source
+                        <input
+                          name="source"
+                          placeholder="e.g. direct reply, existing customer record"
+                          required
+                        />
+                      </label>
+                      <label className="span-2">
+                        Note
+                        <input
+                          name="note"
+                          placeholder="Short factual basis for this record"
+                        />
+                      </label>
+                      <button className="secondary-button" type="submit">
+                        Save permission record
+                      </button>
+                    </form>
+                  </details>
+
                   <details className="m4-contact-edit">
                     <summary>Edit contact</summary>
                     <form
@@ -1944,21 +1987,11 @@ export default async function CompanyIntelligencePage({
                           <option value="UNKNOWN">Unknown</option>
                         </select>
                       </label>
-                      <label>
-                        Contactability
-                        <select
-                          name="contactabilityStatus"
-                          defaultValue={contact.contactabilityStatus}
-                        >
-                          <option value="CONTACT_PERMITTED">Contact permitted</option>
-                          <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
-                          <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
-                          <option value="PUBLIC_BUSINESS_CONTACT">Public business contact</option>
-                          <option value="UNCERTAIN">Uncertain</option>
-                          <option value="DO_NOT_CONTACT">Do not contact</option>
-                          <option value="UNSUBSCRIBED">Unsubscribed</option>
-                        </select>
-                      </label>
+                      <input
+                        type="hidden"
+                        name="contactabilityStatus"
+                        value={contact.contactabilityStatus}
+                      />
                       <label>
                         Contact status
                         <select name="contactStatus" defaultValue={contact.contactStatus}>
@@ -2061,18 +2094,7 @@ export default async function CompanyIntelligencePage({
                   <option value="UNKNOWN">Unknown</option>
                 </select>
               </label>
-              <label>
-                Contactability / compliance
-                <select name="contactabilityStatus" defaultValue="UNCERTAIN">
-                  <option value="UNCERTAIN">Uncertain</option>
-                  <option value="CONTACT_PERMITTED">Contact permitted</option>
-                  <option value="PUBLIC_BUSINESS_CONTACT">Public business contact</option>
-                  <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
-                  <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
-                  <option value="DO_NOT_CONTACT">Do not contact</option>
-                  <option value="UNSUBSCRIBED">Unsubscribed</option>
-                </select>
-              </label>
+              <input type="hidden" name="contactabilityStatus" value="UNCERTAIN" />
               <input type="hidden" name="contactStatus" value="ACTIVE" />
               <label>
                 Verification
