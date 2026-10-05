@@ -301,8 +301,18 @@ export async function addAustralianIndustryDirectoryEvidence(
     if (!match.matched) continue;
 
     const categoryMatched = relevantCategorySemantics(directory, semantics);
+    const contextWithoutCompanyNames = [
+      candidate.displayName,
+      candidate.legalName,
+    ]
+      .filter((value): value is string => Boolean(value?.trim()))
+      .map(normaliseName)
+      .reduce(
+        (text, name) => text.replaceAll(name, " "),
+        normaliseName(match.context),
+      );
     const contextualMatched = matchedIndustrySemantics(
-      match.context,
+      contextWithoutCompanyNames,
       semantics,
     );
 
