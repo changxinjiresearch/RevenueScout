@@ -96,7 +96,13 @@ Status: **completed**
   Leadership, Technology, Potential Operational Pain, Growth and Procurement
 - per-company Signal Timeline
 - live discovery adapter contract
-- first real external provider: GLEIF LEI reference data
+- multi-source semantic discovery is the normal user-facing discovery path
+- semantic industry expansion (for example logistics → freight / warehousing / distribution / supply chain / 3PL and related concepts)
+- GLEIF legal-entity data and Wikidata are independent discovery sources, with verified official company websites used as an additional source family
+- no fixed product-level discovery result cap; provider pagination is exhausted
+- pre-render deduplication by identifiers, verified domain and normalized company identity
+- only companies with at least two independent industry-supporting source families enter the validated discovery list
+- all merged provider identifiers and evidence provenance survive import
 - traceable discovery runs and import provenance
 - company intelligence / enrichment page
 - signed-in Today now reads persisted M2 companies, evidence and signals instead

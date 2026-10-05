@@ -6,31 +6,34 @@ RevenueScout is not intended to be a traditional CRM or a bulk lead database. It
 
 ## Product baseline
 
-The frozen product specification is stored at:
+The frozen product specification and approved discovery amendment are stored at:
 
 - `docs/PRODUCT_SPEC_v1.0.md`
+- `docs/PRODUCT_SPEC_v1.1_DISCOVERY_AMENDMENT.md`
 
-All implementation decisions must remain traceable to that document unless a later version explicitly supersedes it.
+All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
 ## Current development status
 
-The repository is in the initial scaffold phase.
+M0, M1 and M2 are complete. M3 (Opportunity Intelligence) is the next formal milestone.
 
-The first vertical slice implements the core decision surface:
+The current application includes:
 
-- Today's Best Opportunities
-- Opportunity Score
-- score decomposition
-- Why this company
-- Why now
-- recommended offering
-- estimated deal value
-- conversion probability
-- expected revenue
-- recommended contact
-- next best action
+- account, workspace, role and permission management
+- Offering and ICP configuration with executable qualification rules
+- persistent companies, evidence and buying signals
+- multi-source semantic company discovery
+- no fixed product-level discovery result cap
+- pre-render company deduplication across provider identifiers, domains and normalized company identities
+- industry validation requiring at least two independent supporting source families
+- GLEIF and Wikidata discovery inputs plus verified official-company-site evidence
+- RevenueScout Intelligence Engine v2
+- Claim cross-validation and source-independence analysis
+- Current Potential, Evidence Confidence and Conservative/Upside Potential Range
+- Sales Priority, Research Priority and Value of Information
+- persisted, explainable company-research results and a production Today surface
 
-The data shown in the initial UI is demo data. It exists to validate the domain model and product interaction before persistence and external data-source integrations are added.
+The default Intelligence Engine path does not require a paid AI/model/search API.
 
 ## Stack
 
@@ -38,7 +41,7 @@ The data shown in the initial UI is demo data. It exists to validate the domain 
 - React 19
 - TypeScript
 - Vitest
-- PostgreSQL planned for persistence
+- PostgreSQL
 
 ## Local development
 
@@ -62,6 +65,7 @@ npm run build
 - GitHub is the authoritative source for code and product documentation.
 - Product behaviour must remain explainable.
 - Low-confidence information must never be presented as confirmed fact.
+- Missing information must not silently become negative evidence.
 - RevenueScout must not become a bulk-email spam tool.
 - Changes to the frozen product scope require a versioned product-spec update.
 

@@ -1,4 +1,35 @@
-export type DiscoveryProviderId = "GLEIF";
+export type DiscoveryProviderId =
+  | "MULTI_SOURCE"
+  | "GLEIF"
+  | "WIKIDATA";
+
+export type DiscoveryEvidenceSource = {
+  provider: Exclude<DiscoveryProviderId, "MULTI_SOURCE"> | "OFFICIAL_WEBSITE";
+  providerRecordId?: string | null;
+  sourceUrl: string;
+  sourceLabel: string;
+  excerpt: string;
+  observedAt: string;
+  confidence: number;
+  verificationStatus: "CONFIRMED" | "LIKELY" | "UNVERIFIED";
+  sourceFamily: string;
+  matchedSemantics: string[];
+  supportsIndustry: boolean;
+};
+
+export type DiscoveryIndustryValidation = {
+  query: string;
+  status: "CORROBORATED" | "CONFIRMED";
+  confidence: number;
+  independentSupportingFamilyCount: number;
+  matchedSemantics: string[];
+};
+
+export type DiscoveryProviderIdentifier = {
+  provider: Exclude<DiscoveryProviderId, "MULTI_SOURCE">;
+  identifierType: string;
+  identifierValue: string;
+};
 
 export type DiscoveryCandidate = {
   provider: DiscoveryProviderId;
@@ -35,12 +66,26 @@ export type DiscoveryCandidate = {
   observedAt: string;
   sourceConfidence: number;
   verificationStatus: "CONFIRMED" | "LIKELY" | "UNVERIFIED";
+
+  /**
+   * Multi-source discovery metadata. Older persisted runs may not contain these
+   * fields, so they remain optional for backward compatibility.
+   */
+  sourceEvidence?: DiscoveryEvidenceSource[];
+  industryValidation?: DiscoveryIndustryValidation | null;
+  matchedSemantics?: string[];
+  providerIdentifiers?: DiscoveryProviderIdentifier[];
 };
 
 export type DiscoveryQuery = {
   query: string;
   country?: string | null;
   region?: string | null;
+
+  /**
+   * Retained only for adapter compatibility. The production multi-source
+   * discovery path intentionally applies no product-level result cap.
+   */
   limit?: number;
 };
 

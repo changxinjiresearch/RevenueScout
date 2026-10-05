@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   const user = await requireUser();
   const formData = await request.formData();
 
-  const providerId = String(formData.get("provider") ?? "GLEIF");
+  const providerId = String(formData.get("provider") ?? "MULTI_SOURCE");
   const provider = getDiscoveryProvider(providerId);
   const query = String(formData.get("query") ?? "").trim();
   const country = String(formData.get("country") ?? "").trim().toUpperCase() || null;
@@ -60,7 +60,6 @@ export async function POST(request: NextRequest) {
       query,
       country,
       region,
-      limit: 12,
     });
 
     await sql`
