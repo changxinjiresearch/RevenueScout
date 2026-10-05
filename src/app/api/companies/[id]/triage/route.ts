@@ -55,7 +55,7 @@ export async function POST(
             FROM opportunity_snapshots
             WHERE organization_id = ${user.organizationId}
               AND company_id = ${id}
-            ORDER BY created_at ASC
+            ORDER BY created_at DESC
             LIMIT 1
           ),
           NOW(),
