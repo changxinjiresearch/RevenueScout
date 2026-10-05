@@ -531,8 +531,12 @@ export default async function Home() {
                       {opportunity.m3?.effectiveOfferingName ??
                         opportunity.recommendedOffering}
                     </p>
-                    {opportunity.offeringReason ? (
-                      <small className="reason-note">{opportunity.offeringReason}</small>
+                    {opportunity.m3?.effectiveOfferingReason ||
+                    opportunity.offeringReason ? (
+                      <small className="reason-note">
+                        {opportunity.m3?.effectiveOfferingReason ??
+                          opportunity.offeringReason}
+                      </small>
                     ) : null}
                   </div>
                 </div>
