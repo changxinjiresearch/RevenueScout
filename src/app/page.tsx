@@ -598,11 +598,17 @@ export default async function Home() {
                       : `${Math.round(opportunity.conversionProbability * 100)}% × ${money(opportunity.expectedDealValue)}`}
                   </small>
                   {opportunity.m3 ? (
-                    <small>
-                      Deal range {money(opportunity.m3.dealValueLow)}–
-                      {money(opportunity.m3.dealValueHigh)} ·{" "}
-                      {opportunity.m3.salesEffort.toLowerCase()} sales effort
-                    </small>
+                    <>
+                      <small>
+                        Revenue range {money(opportunity.m3.expectedRevenueLow)}–
+                        {money(opportunity.m3.expectedRevenueHigh)}
+                      </small>
+                      <small>
+                        Deal range {money(opportunity.m3.dealValueLow)}–
+                        {money(opportunity.m3.dealValueHigh)} ·{" "}
+                        {opportunity.m3.salesEffort.toLowerCase()} sales effort
+                      </small>
+                    </>
                   ) : null}
                 </div>
 
