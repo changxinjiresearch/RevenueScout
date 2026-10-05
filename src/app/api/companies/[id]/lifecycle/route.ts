@@ -197,6 +197,24 @@ export async function POST(
     LIMIT 1
   `;
 
+  const resolvedActualOfferingId =
+    actualOfferingId ?? latestSnapshot?.offeringId ?? null;
+  const resolvedPrimaryContactId =
+    primaryContactId ?? current?.primaryContactId ?? null;
+
+  if (stage === "WON" && !resolvedActualOfferingId) {
+    return NextResponse.json(
+      { error: "Won deals require an Offering." },
+      { status: 400 },
+    );
+  }
+  if (stage === "WON" && !resolvedPrimaryContactId) {
+    return NextResponse.json(
+      { error: "Won deals require a primary contact." },
+      { status: 400 },
+    );
+  }
+
   const keySignals = await sql<{ id: string }[]>`
     SELECT id
     FROM buying_signals
@@ -369,8 +387,8 @@ export async function POST(
           ${latestSnapshot?.dealValueExpected ?? null},
           ${latestSnapshot?.expectedRevenue ?? null},
           ${stage === "WON" ? actualContractValue : null},
-          ${actualOfferingId ?? latestSnapshot?.offeringId ?? null},
-          ${primaryContactId ?? current?.primaryContactId ?? null},
+          ${resolvedActualOfferingId},
+          ${resolvedPrimaryContactId},
           ${stage === "LOST" ? lostReason : null},
           ${stage === "LOST" ? lostReasonNote : ""},
           ${
