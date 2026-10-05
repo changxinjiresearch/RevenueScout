@@ -39,6 +39,7 @@ export type EffectiveOpportunity = PersistedOpportunitySnapshot & {
   override: OpportunityOverride | null;
   effectiveOfferingId: string | null;
   effectiveOfferingName: string;
+  effectiveOfferingReason: string;
   effectiveConversionProbability: number;
   effectiveDealValue: number;
   effectiveExpectedRevenue: number;
@@ -296,6 +297,13 @@ export function applyOpportunityOverride(input: {
     override,
     effectiveOfferingId: overrideOffering?.id ?? snapshot.offeringId,
     effectiveOfferingName: overrideOffering?.name ?? snapshot.offeringName,
+    effectiveOfferingReason: overrideOffering
+      ? "Human override selected " +
+        overrideOffering.name +
+        "; model recommendation was " +
+        snapshot.offeringName +
+        "."
+      : snapshot.offeringReason,
     effectiveConversionProbability,
     effectiveDealValue,
     effectiveExpectedRevenue,
