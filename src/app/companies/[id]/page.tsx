@@ -713,16 +713,23 @@ export default async function CompanyIntelligencePage({
               u.name AS "actorName",
               a.created_at AS "createdAt"
             FROM sales_activities a
-            JOIN contact_frequency_policies p
-              ON p.organization_id = a.organization_id
             LEFT JOIN users u ON u.id = a.actor_id
             WHERE a.organization_id = ${user.organizationId}
               AND a.contact_id = ${recommendedContactRecord.id}
               AND a.direction = 'OUTBOUND'
               AND a.activity_status NOT IN ('PLANNED','CANCELLED')
               AND a.actor_id IS DISTINCT FROM ${user.id}
-              AND a.created_at >=
-                NOW() - (p.duplicate_warning_hours || ' hours')::interval
+              AND a.created_at >= NOW() - (
+                COALESCE(
+                  (
+                    SELECT duplicate_warning_hours
+                    FROM contact_frequency_policies
+                    WHERE organization_id = ${user.organizationId}
+                    LIMIT 1
+                  ),
+                  48
+                ) || ' hours'
+              )::interval
             ORDER BY a.created_at DESC
             LIMIT 1
           `
