@@ -4122,3 +4122,79 @@ select {
     grid-template-columns: 1fr;
   }
 }
+
+
+.m6-top-opportunities {
+  margin-bottom: 4px;
+}
+
+.m6-top-list {
+  display: grid;
+  gap: 8px;
+}
+
+.m6-top-list article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid #e7ebf2;
+  border-radius: 11px;
+  background: #fff;
+}
+
+.m6-rank {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #eef3fb;
+  color: #315ea8;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.m6-top-company,
+.m6-top-value {
+  display: grid;
+  gap: 3px;
+}
+
+.m6-top-company a {
+  color: #2f405a;
+  text-decoration: none;
+}
+
+.m6-top-company strong {
+  font-size: 11px;
+}
+
+.m6-top-company span,
+.m6-top-company small,
+.m6-top-value span,
+.m6-top-value small {
+  color: #7d899b;
+  font-size: 9px;
+}
+
+.m6-top-value {
+  justify-items: end;
+}
+
+.m6-top-value strong {
+  color: #293b56;
+  font-size: 14px;
+}
+
+@media (max-width: 520px) {
+  .m6-top-list article {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .m6-top-value {
+    grid-column: 2;
+    justify-items: start;
+  }
+}
