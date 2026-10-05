@@ -3,7 +3,10 @@ import {
   expandIndustrySemantics,
   matchedIndustrySemantics,
 } from "../src/lib/discovery/semantic";
-import { dedupeDiscoveryCandidates } from "../src/lib/discovery/multi-source";
+import {
+  dedupeDiscoveryCandidates,
+  industryValidationForCandidate,
+} from "../src/lib/discovery/multi-source";
 import type { DiscoveryCandidate } from "../src/lib/discovery/types";
 
 function candidate(input: {
@@ -96,6 +99,48 @@ describe("semantic discovery", () => {
     expect(matches).toContain("freight");
     expect(matches).toContain("freight forwarding");
     expect(matches).toContain("warehousing");
+  });
+
+
+  it("rejects a candidate supported by only one industry source family", () => {
+    const oneSource = candidate({
+      provider: "GLEIF",
+      id: "LEI-ONLY",
+      name: "Solo Logistics Pty Ltd",
+      country: "AU",
+      sourceFamily: "gleif.org",
+    });
+
+    expect(
+      industryValidationForCandidate(oneSource, "logistics"),
+    ).toBeNull();
+  });
+
+  it("accepts industry relevance only after two independent source families agree", () => {
+    const merged = dedupeDiscoveryCandidates([
+      candidate({
+        provider: "GLEIF",
+        id: "LEI-2",
+        name: "Verified Freight Pty Ltd",
+        country: "AU",
+        domain: "verifiedfreight.com.au",
+        sourceFamily: "gleif.org",
+      }),
+      candidate({
+        provider: "WIKIDATA",
+        id: "Q2",
+        name: "Verified Freight",
+        country: "AU",
+        domain: "verifiedfreight.com.au",
+        sourceFamily: "wikidata.org",
+      }),
+    ])[0];
+
+    const validation = industryValidationForCandidate(merged, "logistics");
+
+    expect(validation).not.toBeNull();
+    expect(validation?.independentSupportingFamilyCount).toBe(2);
+    expect(validation?.status).toBe("CORROBORATED");
   });
 
   it("deduplicates the same company across providers and retains provenance", () => {
