@@ -19,7 +19,10 @@ import {
   type DiscoveryIcpContext,
 } from "@/lib/discovery/priority";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
-import { searchWikidata } from "@/lib/discovery/wikidata";
+import {
+  findWikidataCompanyEvidence,
+  searchWikidata,
+} from "@/lib/discovery/wikidata";
 
 type RunRow = {
   id: string;
@@ -150,6 +153,70 @@ async function advanceDiscovery(
   };
 }
 
+async function addWikidataCorroboration(
+  candidate: DiscoveryCandidate,
+  semantics: string[],
+): Promise<DiscoveryCandidate> {
+  if (
+    (candidate.sourceEvidence ?? []).some(
+      (item) => item.provider === "WIKIDATA",
+    )
+  ) {
+    return candidate;
+  }
+
+  try {
+    const found = await findWikidataCompanyEvidence({
+      displayName: candidate.displayName,
+      legalName: candidate.legalName,
+      country: candidate.country,
+      semantics,
+    });
+    if (!found) return candidate;
+
+    const evidence = [
+      ...(candidate.sourceEvidence ?? []),
+      found.evidence,
+    ];
+    const identifiers = [
+      ...(candidate.providerIdentifiers ?? []),
+      found.identifier,
+    ];
+
+    return {
+      ...candidate,
+      website: candidate.website ?? found.website,
+      domain: candidate.domain ?? found.domain,
+      sourceEvidence: evidence.filter(
+        (item, index, values) =>
+          values.findIndex(
+            (other) =>
+              other.provider === item.provider &&
+              other.sourceFamily === item.sourceFamily &&
+              other.sourceUrl === item.sourceUrl,
+          ) === index,
+      ),
+      providerIdentifiers: identifiers.filter(
+        (item, index, values) =>
+          values.findIndex(
+            (other) =>
+              other.provider === item.provider &&
+              other.identifierType === item.identifierType &&
+              other.identifierValue === item.identifierValue,
+          ) === index,
+      ),
+      matchedSemantics: [
+        ...new Set([
+          ...(candidate.matchedSemantics ?? []),
+          ...found.evidence.matchedSemantics,
+        ]),
+      ],
+    };
+  } catch {
+    return candidate;
+  }
+}
+
 async function advanceValidation(
   state: ProgressiveDiscoveryWorkState,
   run: RunRow,
@@ -172,8 +239,14 @@ async function advanceValidation(
     };
   }
 
-  const enriched = await Promise.all(
+  const withWikidata = await Promise.all(
     batch.map((candidate) =>
+      addWikidataCorroboration(candidate, state.semantics),
+    ),
+  );
+
+  const enriched = await Promise.all(
+    withWikidata.map((candidate) =>
       addOfficialWebsiteEvidence(candidate, state.semantics),
     ),
   );

@@ -1,4 +1,5 @@
 import { matchedIndustrySemantics } from "./semantic";
+import { geographyMatches } from "./geography";
 import type {
   DiscoveryCandidate,
   DiscoveryPriority,
@@ -97,7 +98,9 @@ function assessBase(
     if (icp.countries.length > 0) {
       if (!candidate.country) {
         missingFields.push("Country");
-      } else if (exactMatch(icp.countries, candidate.country)) {
+      } else if (
+        geographyMatches(icp.countries, candidate.country, "country")
+      ) {
         score += 8;
         matchedFields.push("Target country");
       } else {
@@ -108,7 +111,14 @@ function assessBase(
     if (icp.states.length > 0) {
       if (!candidate.state) {
         missingFields.push("State / region");
-      } else if (exactMatch(icp.states, candidate.state)) {
+      } else if (
+        geographyMatches(
+          icp.states,
+          candidate.state,
+          "region",
+          candidate.country,
+        )
+      ) {
         score += 4;
         matchedFields.push("Target state / region");
       } else {

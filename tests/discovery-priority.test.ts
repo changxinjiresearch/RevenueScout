@@ -126,6 +126,30 @@ describe("discovery priority", () => {
     );
   });
 
+
+  it("treats Australia/AU and VIC/AU-VIC as equivalent ICP geography", () => {
+    const results = rankDiscoveryCandidates(
+      [
+        validatedCandidate("Q-GEO", {
+          country: "AU",
+          state: "AU-VIC",
+        }),
+      ],
+      {
+        ...icp,
+        countries: ["Australia"],
+        states: ["VIC"],
+      },
+    );
+
+    const priority = results[0].discoveryPriority;
+    expect(priority?.qualificationStatus).toBe("PARTIALLY_QUALIFIED");
+    expect(priority?.failedFields).not.toContain("Country outside ICP");
+    expect(priority?.failedFields).not.toContain("State / region outside ICP");
+    expect(priority?.matchedFields).toContain("Target country");
+    expect(priority?.matchedFields).toContain("Target state / region");
+  });
+
   it("creates a real high-priority tier from the strongest validated results", () => {
     const results = rankDiscoveryCandidates(
       [
