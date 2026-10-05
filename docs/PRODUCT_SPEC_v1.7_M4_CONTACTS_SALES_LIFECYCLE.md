@@ -204,8 +204,10 @@ The outcome may also retain:
 
 ## Prediction vs Reality
 
-When a company closes Won or Lost, RevenueScout snapshots the latest M3
-prediction into the outcome record:
+When a company first enters the sales lifecycle, RevenueScout stores the
+current M3 opportunity snapshot as the **origin prediction**. When the company
+later closes Won or Lost, the outcome record uses that origin snapshot (falling
+back to the current M3 snapshot only when no origin snapshot was available):
 
 - Original Opportunity Score;
 - Original Conversion Probability;
