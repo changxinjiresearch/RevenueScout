@@ -5,19 +5,134 @@ import {
   normaliseCompanyName,
   normaliseDomain,
 } from "./dedupe";
-import type { DiscoveryCandidate } from "@/lib/discovery/types";
+import type {
+  DiscoveryCandidate,
+  DiscoveryEvidenceSource,
+  DiscoveryProviderIdentifier,
+} from "@/lib/discovery/types";
 
-function evidenceHash(candidate: DiscoveryCandidate): string {
+type PersistableEvidence = {
+  sourceType: string;
+  sourceUrl: string;
+  sourceLabel: string;
+  title: string;
+  excerpt: string;
+  observedAt: string;
+  confidence: number;
+  verificationStatus: "CONFIRMED" | "LIKELY" | "UNVERIFIED";
+  providerRecordId: string | null;
+  sourceFamily: string | null;
+  rawPayload: unknown;
+};
+
+function candidateIdentifiers(
+  candidate: DiscoveryCandidate,
+): DiscoveryProviderIdentifier[] {
+  if (candidate.providerIdentifiers?.length) {
+    return candidate.providerIdentifiers;
+  }
+
+  if (candidate.provider === "GLEIF") {
+    return [
+      {
+        provider: "GLEIF",
+        identifierType: "LEI",
+        identifierValue: candidate.providerRecordId,
+      },
+    ];
+  }
+
+  if (candidate.provider === "WIKIDATA") {
+    return [
+      {
+        provider: "WIKIDATA",
+        identifierType: "WIKIDATA",
+        identifierValue: candidate.providerRecordId,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function candidateEvidence(candidate: DiscoveryCandidate): PersistableEvidence[] {
+  if (candidate.sourceEvidence?.length) {
+    return candidate.sourceEvidence.map((evidence: DiscoveryEvidenceSource) => ({
+      sourceType: evidence.provider,
+      sourceUrl: evidence.sourceUrl,
+      sourceLabel: evidence.sourceLabel,
+      title: candidate.legalName || candidate.displayName,
+      excerpt: evidence.excerpt,
+      observedAt: evidence.observedAt,
+      confidence: evidence.confidence,
+      verificationStatus: evidence.verificationStatus,
+      providerRecordId: evidence.providerRecordId ?? null,
+      sourceFamily: evidence.sourceFamily,
+      rawPayload: evidence,
+    }));
+  }
+
+  return [
+    {
+      sourceType: candidate.provider,
+      sourceUrl: candidate.sourceUrl,
+      sourceLabel: candidate.sourceLabel,
+      title: candidate.legalName,
+      excerpt:
+        candidate.description ??
+        "External discovery record retained for provenance.",
+      observedAt: candidate.observedAt,
+      confidence: candidate.sourceConfidence,
+      verificationStatus: candidate.verificationStatus,
+      providerRecordId: candidate.providerRecordId,
+      sourceFamily: null,
+      rawPayload: candidate,
+    },
+  ];
+}
+
+function evidenceHash(
+  candidate: DiscoveryCandidate,
+  evidence: PersistableEvidence,
+): string {
   return createHash("sha256")
     .update(
       [
-        candidate.provider,
-        candidate.providerRecordId,
-        candidate.sourceUrl,
-        candidate.observedAt,
+        candidate.displayName,
+        evidence.sourceType,
+        evidence.providerRecordId ?? "",
+        evidence.sourceUrl,
+        evidence.excerpt,
       ].join("|"),
     )
     .digest("hex");
+}
+
+async function findDuplicateAcrossIdentifiers(input: {
+  organizationId: string;
+  candidate: DiscoveryCandidate;
+  domain: string | null;
+}) {
+  const identifiers = candidateIdentifiers(input.candidate);
+
+  for (const identifier of identifiers) {
+    const match = await findCompanyDuplicate({
+      organizationId: input.organizationId,
+      displayName: input.candidate.displayName,
+      country: input.candidate.country,
+      domain: input.domain,
+      identifierType: identifier.identifierType,
+      identifierValue: identifier.identifierValue,
+    });
+    if (match) return match;
+  }
+
+  return findCompanyDuplicate({
+    organizationId: input.organizationId,
+    displayName: input.candidate.displayName,
+    country: input.candidate.country,
+    domain: input.domain,
+  });
 }
 
 export async function importDiscoveryCandidate(input: {
@@ -27,58 +142,84 @@ export async function importDiscoveryCandidate(input: {
 }): Promise<{ companyId: string; duplicate: boolean; duplicateReason?: string }> {
   const { organizationId, userId, candidate } = input;
   const domain = normaliseDomain(candidate.domain ?? candidate.website);
+  const identifiers = candidateIdentifiers(candidate);
+  const evidence = candidateEvidence(candidate);
 
-  const duplicate = await findCompanyDuplicate({
+  const duplicate = await findDuplicateAcrossIdentifiers({
     organizationId,
-    displayName: candidate.displayName,
-    country: candidate.country,
+    candidate,
     domain,
-    identifierType:
-      candidate.provider === "GLEIF" ? "LEI" : candidate.provider,
-    identifierValue: candidate.providerRecordId,
   });
 
   const sql = db();
 
   if (duplicate) {
-    await sql`
-      INSERT INTO company_evidence (
-        organization_id,
-        company_id,
-        source_type,
-        source_url,
-        source_label,
-        title,
-        excerpt,
-        observed_at,
-        confidence,
-        verification_status,
-        stale_after_days,
-        content_hash,
-        provider_record_id,
-        raw_payload,
-        created_by
-      )
-      VALUES (
-        ${organizationId},
-        ${duplicate.id},
-        ${candidate.provider},
-        ${candidate.sourceUrl},
-        ${candidate.sourceLabel},
-        ${candidate.legalName},
-        ${candidate.description ?? "External legal-entity record."},
-        ${new Date(candidate.observedAt)},
-        ${candidate.sourceConfidence},
-        ${candidate.verificationStatus},
-        180,
-        ${evidenceHash(candidate)},
-        ${candidate.providerRecordId},
-        ${JSON.stringify(candidate)}::text::jsonb,
-        ${userId}
-      )
-      ON CONFLICT (company_id, content_hash) WHERE content_hash IS NOT NULL
-      DO NOTHING
-    `;
+    for (const item of evidence) {
+      await sql`
+        INSERT INTO company_evidence (
+          organization_id,
+          company_id,
+          source_type,
+          source_url,
+          source_label,
+          title,
+          excerpt,
+          observed_at,
+          confidence,
+          verification_status,
+          stale_after_days,
+          content_hash,
+          provider_record_id,
+          raw_payload,
+          source_family,
+          source_quality,
+          extraction_confidence,
+          created_by
+        )
+        VALUES (
+          ${organizationId},
+          ${duplicate.id},
+          ${item.sourceType},
+          ${item.sourceUrl},
+          ${item.sourceLabel},
+          ${item.title},
+          ${item.excerpt},
+          ${new Date(item.observedAt)},
+          ${item.confidence},
+          ${item.verificationStatus},
+          180,
+          ${evidenceHash(candidate, item)},
+          ${item.providerRecordId},
+          ${JSON.stringify(item.rawPayload)}::text::jsonb,
+          ${item.sourceFamily},
+          ${item.confidence},
+          0.95,
+          ${userId}
+        )
+        ON CONFLICT (company_id, content_hash) WHERE content_hash IS NOT NULL
+        DO NOTHING
+      `;
+    }
+
+    for (const identifier of identifiers) {
+      await sql`
+        INSERT INTO company_identifiers (
+          organization_id,
+          company_id,
+          identifier_type,
+          identifier_value,
+          provider
+        )
+        VALUES (
+          ${organizationId},
+          ${duplicate.id},
+          ${identifier.identifierType},
+          ${identifier.identifierValue},
+          ${identifier.provider}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+    }
 
     return {
       companyId: duplicate.id,
@@ -162,60 +303,72 @@ export async function importDiscoveryCandidate(input: {
 
     companyId = company.id;
 
-    await tx`
-      INSERT INTO company_identifiers (
-        organization_id,
-        company_id,
-        identifier_type,
-        identifier_value,
-        provider
-      )
-      VALUES (
-        ${organizationId},
-        ${company.id},
-        ${candidate.provider === "GLEIF" ? "LEI" : candidate.provider},
-        ${candidate.providerRecordId},
-        ${candidate.provider}
-      )
-      ON CONFLICT DO NOTHING
-    `;
+    for (const identifier of identifiers) {
+      await tx`
+        INSERT INTO company_identifiers (
+          organization_id,
+          company_id,
+          identifier_type,
+          identifier_value,
+          provider
+        )
+        VALUES (
+          ${organizationId},
+          ${company.id},
+          ${identifier.identifierType},
+          ${identifier.identifierValue},
+          ${identifier.provider}
+        )
+        ON CONFLICT DO NOTHING
+      `;
+    }
 
-    await tx`
-      INSERT INTO company_evidence (
-        organization_id,
-        company_id,
-        source_type,
-        source_url,
-        source_label,
-        title,
-        excerpt,
-        observed_at,
-        confidence,
-        verification_status,
-        stale_after_days,
-        content_hash,
-        provider_record_id,
-        raw_payload,
-        created_by
-      )
-      VALUES (
-        ${organizationId},
-        ${company.id},
-        ${candidate.provider},
-        ${candidate.sourceUrl},
-        ${candidate.sourceLabel},
-        ${candidate.legalName},
-        ${candidate.description ?? "External legal-entity record."},
-        ${new Date(candidate.observedAt)},
-        ${candidate.sourceConfidence},
-        ${candidate.verificationStatus},
-        180,
-        ${evidenceHash(candidate)},
-        ${candidate.providerRecordId},
-        ${JSON.stringify(candidate)}::text::jsonb,
-        ${userId}
-      )
-    `;
+    for (const item of evidence) {
+      await tx`
+        INSERT INTO company_evidence (
+          organization_id,
+          company_id,
+          source_type,
+          source_url,
+          source_label,
+          title,
+          excerpt,
+          observed_at,
+          confidence,
+          verification_status,
+          stale_after_days,
+          content_hash,
+          provider_record_id,
+          raw_payload,
+          source_family,
+          source_quality,
+          extraction_confidence,
+          created_by
+        )
+        VALUES (
+          ${organizationId},
+          ${company.id},
+          ${item.sourceType},
+          ${item.sourceUrl},
+          ${item.sourceLabel},
+          ${item.title},
+          ${item.excerpt},
+          ${new Date(item.observedAt)},
+          ${item.confidence},
+          ${item.verificationStatus},
+          180,
+          ${evidenceHash(candidate, item)},
+          ${item.providerRecordId},
+          ${JSON.stringify(item.rawPayload)}::text::jsonb,
+          ${item.sourceFamily},
+          ${item.confidence},
+          0.95,
+          ${userId}
+        )
+        ON CONFLICT (company_id, content_hash) WHERE content_hash IS NOT NULL
+        DO NOTHING
+      `;
+    }
   });
 
   return { companyId, duplicate: false };
