@@ -41,10 +41,13 @@ type PriorityRun = {
 type TodayLifecycle = {
   companyId: string;
   stage: string;
+  ownerUserId: string | null;
   ownerName: string | null;
   lastContactAt: Date | null;
   nextActionAt: Date | null;
   nextAction: string;
+  watched: boolean;
+  suppressed: boolean;
 };
 
 type TodayItem = OpportunityInput & {
@@ -83,7 +86,20 @@ function money(value: number): string {
   }).format(value);
 }
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{
+    view?: string;
+    stage?: string;
+    sort?: string;
+    feedback?: string;
+    activity?: string;
+    assigned?: string;
+    watchlist?: string;
+  }>;
+}) {
+  const params = await searchParams;
   const user = await getCurrentUser();
   let items: TodayItem[] = [];
   let configVersion: number | null = null;
@@ -258,15 +274,32 @@ export default async function Home() {
         `,
         sql<TodayLifecycle[]>`
           SELECT
-            l.company_id AS "companyId",
-            l.stage,
+            c.id AS "companyId",
+            COALESCE(l.stage, 'DISCOVERED') AS stage,
+            l.owner_user_id AS "ownerUserId",
             owner.name AS "ownerName",
             l.last_contact_at AS "lastContactAt",
             l.next_action_at AS "nextActionAt",
-            l.next_action AS "nextAction"
-          FROM company_sales_lifecycle l
+            COALESCE(l.next_action, '') AS "nextAction",
+            (w.company_id IS NOT NULL) AS watched,
+            EXISTS (
+              SELECT 1
+              FROM suppression_entries s
+              WHERE s.organization_id = c.organization_id
+                AND s.company_id = c.id
+                AND s.scope = 'COMPANY'
+                AND s.active = TRUE
+                AND (s.expires_at IS NULL OR s.expires_at > NOW())
+            ) AS suppressed
+          FROM companies c
+          LEFT JOIN company_sales_lifecycle l
+            ON l.organization_id = c.organization_id
+           AND l.company_id = c.id
           LEFT JOIN users owner ON owner.id = l.owner_user_id
-          WHERE l.organization_id = ${user.organizationId}
+          LEFT JOIN watchlist_entries w
+            ON w.organization_id = c.organization_id
+           AND w.company_id = c.id
+          WHERE c.organization_id = ${user.organizationId}
         `,
       ]);
 
@@ -282,8 +315,14 @@ export default async function Home() {
     const lifecycleByCompany = new Map(
       lifecycleRows.map((lifecycle) => [lifecycle.companyId, lifecycle]),
     );
+    const suppressedCompanyIds = new Set(
+      lifecycleRows
+        .filter((lifecycle) => lifecycle.suppressed)
+        .map((lifecycle) => lifecycle.companyId),
+    );
 
     for (const company of companies) {
+      if (suppressedCompanyIds.has(company.id)) continue;
       const companyEvidence = evidence.filter(
         (item) => item.companyId === company.id,
       );
@@ -354,6 +393,7 @@ export default async function Home() {
           run.upsideScore !== null &&
           run.valueOfInformationScore !== null &&
           run.priorityAction !== "REJECT" &&
+          !suppressedCompanyIds.has(run.companyId) &&
           (run.priorityAction === "INVESTIGATE_URGENTLY" ||
             run.priorityAction === "GATHER_MORE_DATA" ||
             (run.researchPriorityScore ?? 0) > (run.salesPriorityScore ?? 0) ||
@@ -411,19 +451,87 @@ export default async function Home() {
     return 1;
   }
 
-  items.sort(
-    (a, b) =>
+  const allOpportunityItems = [...items];
+  const now = new Date();
+
+  if (user) {
+    if (params.view === "mine") {
+      items = items.filter((item) => item.m4?.ownerUserId === user.id);
+    } else if (params.view === "due") {
+      items = items.filter(
+        (item) =>
+          item.m4?.nextActionAt &&
+          new Date(item.m4.nextActionAt).getTime() <= now.getTime(),
+      );
+    } else if (params.view === "unassigned") {
+      items = items.filter((item) => !item.m4?.ownerUserId);
+    } else if (params.view === "watchlist") {
+      items = items.filter((item) => item.m4?.watched);
+    }
+
+    if (params.stage) {
+      items = items.filter(
+        (item) => (item.m4?.stage ?? "DISCOVERED") === params.stage,
+      );
+    }
+  }
+
+  const sortMode = params.sort ?? "priority";
+  items.sort((a, b) => {
+    if (sortMode === "revenue") {
+      return (
+        (b.m3?.effectiveExpectedRevenue ?? b.assessment.expectedRevenue) -
+        (a.m3?.effectiveExpectedRevenue ?? a.assessment.expectedRevenue)
+      );
+    }
+    if (sortMode === "score") {
+      return b.assessment.opportunityScore - a.assessment.opportunityScore;
+    }
+    if (sortMode === "probability") {
+      return (
+        (b.m3?.effectiveConversionProbability ?? b.conversionProbability) -
+        (a.m3?.effectiveConversionProbability ?? a.conversionProbability)
+      );
+    }
+    if (sortMode === "next") {
+      return (
+        (a.m4?.nextActionAt
+          ? new Date(a.m4.nextActionAt).getTime()
+          : Number.MAX_SAFE_INTEGER) -
+        (b.m4?.nextActionAt
+          ? new Date(b.m4.nextActionAt).getTime()
+          : Number.MAX_SAFE_INTEGER)
+      );
+    }
+
+    return (
       overrideOrder(b) - overrideOrder(a) ||
       (b.m3?.effectiveRankScore ?? -1) - (a.m3?.effectiveRankScore ?? -1) ||
       (b.salesPriorityScore ?? -1) - (a.salesPriorityScore ?? -1) ||
-      b.assessment.opportunityScore - a.assessment.opportunityScore,
-  );
+      b.assessment.opportunityScore - a.assessment.opportunityScore
+    );
+  });
 
   const expectedRevenue = items.reduce(
     (sum, item) =>
       sum + (item.m3?.effectiveExpectedRevenue ?? item.assessment.expectedRevenue),
     0,
   );
+
+  const dueActionCount = allOpportunityItems.filter(
+    (item) =>
+      item.m4?.nextActionAt &&
+      new Date(item.m4.nextActionAt).getTime() <= now.getTime(),
+  ).length;
+  const watchCount = allOpportunityItems.filter((item) => item.m4?.watched).length;
+  const unassignedCount = allOpportunityItems.filter(
+    (item) => !item.m4?.ownerUserId,
+  ).length;
+  const stageOptions = [
+    ...new Set(
+      allOpportunityItems.map((item) => item.m4?.stage ?? "DISCOVERED"),
+    ),
+  ].sort();
 
   return (
     <main className="shell">
@@ -439,7 +547,9 @@ export default async function Home() {
           {user ? (
             <>
               <Link className="status-pill" href="/discover">Discover</Link>
-              <Link className="status-pill" href="/companies">Companies</Link>
+              <Link className="status-pill" href="/companies">Search</Link>
+              <Link className="status-pill" href="/watchlist">Watchlist</Link>
+              <Link className="status-pill" href="/compliance">Compliance</Link>
               <Link className="status-pill" href="/setup">Market Setup</Link>
               <Link className="status-pill" href="/workspace">Workspace</Link>
               <div className="status-pill">Config v{configVersion}</div>
@@ -454,9 +564,22 @@ export default async function Home() {
         </div>
       </header>
 
-      <section className="summary-grid" aria-label="Today summary">
+      {params.feedback ? (
+        <div className="success-banner">Recommendation feedback recorded.</div>
+      ) : null}
+      {params.activity ? (
+        <div className="success-banner">Sales activity recorded.</div>
+      ) : null}
+      {params.assigned ? (
+        <div className="success-banner">Opportunity assigned to you.</div>
+      ) : null}
+      {params.watchlist ? (
+        <div className="success-banner">Watchlist updated.</div>
+      ) : null}
+
+      <section className="summary-grid m5-summary-grid" aria-label="Today summary">
         <article className="summary-card">
-          <span>Recommended opportunities</span>
+          <span>Visible opportunities</span>
           <strong>{items.length}</strong>
         </article>
         <article className="summary-card">
@@ -464,10 +587,57 @@ export default async function Home() {
           <strong>{money(expectedRevenue)}</strong>
         </article>
         <article className="summary-card">
+          <span>Due actions</span>
+          <strong>{dueActionCount}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Watchlist</span>
+          <strong>{watchCount}</strong>
+        </article>
+        <article className="summary-card">
+          <span>Unassigned</span>
+          <strong>{unassignedCount}</strong>
+        </article>
+        <article className="summary-card">
           <span>Research candidates</span>
           <strong>{researchQueue.length}</strong>
         </article>
       </section>
+
+      {user ? (
+        <section className="m5-today-toolbar">
+          <div className="m5-view-links">
+            <Link className={params.view ? "" : "active"} href="/">All</Link>
+            <Link className={params.view === "mine" ? "active" : ""} href="/?view=mine">Mine</Link>
+            <Link className={params.view === "due" ? "active" : ""} href="/?view=due">Due</Link>
+            <Link className={params.view === "unassigned" ? "active" : ""} href="/?view=unassigned">Unassigned</Link>
+            <Link className={params.view === "watchlist" ? "active" : ""} href="/?view=watchlist">Watchlist</Link>
+          </div>
+          <form className="m5-today-filters" method="get">
+            {params.view ? <input type="hidden" name="view" value={params.view} /> : null}
+            <select name="stage" defaultValue={params.stage ?? ""}>
+              <option value="">Any stage</option>
+              {stageOptions.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stage
+                    .toLowerCase()
+                    .split("_")
+                    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+                    .join(" ")}
+                </option>
+              ))}
+            </select>
+            <select name="sort" defaultValue={sortMode}>
+              <option value="priority">Best opportunity</option>
+              <option value="revenue">Expected revenue</option>
+              <option value="probability">Conversion probability</option>
+              <option value="score">Opportunity score</option>
+              <option value="next">Next action date</option>
+            </select>
+            <button className="secondary-button" type="submit">Apply</button>
+          </form>
+        </section>
+      ) : null}
 
       <section className="section-heading">
         <div>
@@ -621,6 +791,71 @@ export default async function Home() {
                   </strong>
                   <span>Best person: {opportunity.recommendedContact}</span>
                 </div>
+
+                {user ? (
+                  <div className="m5-card-action-area">
+                    <div className="m5-card-actions">
+                      {opportunity.m4?.ownerUserId !== user.id ? (
+                        <form
+                          action={`/api/companies/${opportunity.id}/assign-self`}
+                          method="post"
+                        >
+                          <input type="hidden" name="returnTo" value="/" />
+                          <button className="text-button" type="submit">
+                            Assign to me
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="m5-inline-state">Mine</span>
+                      )}
+                      <form
+                        action={`/api/companies/${opportunity.id}/watchlist`}
+                        method="post"
+                      >
+                        <input
+                          type="hidden"
+                          name="action"
+                          value={opportunity.m4?.watched ? "remove" : "add"}
+                        />
+                        <input type="hidden" name="returnTo" value="/" />
+                        <button className="text-button" type="submit">
+                          {opportunity.m4?.watched ? "Stop watching" : "Watch"}
+                        </button>
+                      </form>
+                    </div>
+                    <div className="m5-feedback-row">
+                    <form action="/api/feedback" method="post">
+                      <input type="hidden" name="companyId" value={opportunity.id} />
+                      <input type="hidden" name="useful" value="true" />
+                      <input type="hidden" name="returnTo" value="/" />
+                      <button className="text-button" type="submit">
+                        👍 Useful
+                      </button>
+                    </form>
+                    <details>
+                      <summary>👎 Not useful</summary>
+                      <form className="m5-feedback-form" action="/api/feedback" method="post">
+                        <input type="hidden" name="companyId" value={opportunity.id} />
+                        <input type="hidden" name="useful" value="false" />
+                        <input type="hidden" name="returnTo" value="/" />
+                        <select name="reason" defaultValue="WRONG_TIMING" required>
+                          <option value="WRONG_COMPANY">Wrong company</option>
+                          <option value="WRONG_TIMING">Wrong timing</option>
+                          <option value="WRONG_SIGNAL">Wrong signal</option>
+                          <option value="WRONG_OFFERING">Wrong Offering</option>
+                          <option value="TOO_SMALL">Too small</option>
+                          <option value="TOO_LARGE">Too large</option>
+                          <option value="ALREADY_CONTACTED">Already contacted</option>
+                          <option value="OTHER">Other</option>
+                        </select>
+                        <button className="secondary-button" type="submit">
+                          Submit
+                        </button>
+                      </form>
+                    </details>
+                    </div>
+                  </div>
+                ) : null}
               </div>
 
               <aside className="score-column">

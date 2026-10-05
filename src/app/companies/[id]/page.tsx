@@ -261,6 +261,12 @@ export default async function CompanyIntelligencePage({
     contact?: string;
     activity?: string;
     lifecycle?: string;
+    watchlist?: string;
+    assigned?: string;
+    feedback?: string;
+    suppression?: string;
+    consent?: string;
+    outreach_warning?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -683,6 +689,63 @@ export default async function CompanyIntelligencePage({
   );
   const recommendedContactRecord =
     contacts.find((contact) => contact.id === recommendedContact.contactId) ?? null;
+  const [watchEntry, activeCompanySuppression, duplicateContact] =
+    await Promise.all([
+      sql<{ reason: string }[]>`
+        SELECT reason
+        FROM watchlist_entries
+        WHERE organization_id = ${user.organizationId}
+          AND company_id = ${id}
+        LIMIT 1
+      `,
+      sql<{ count: number }[]>`
+        SELECT COUNT(*)::int AS count
+        FROM suppression_entries
+        WHERE organization_id = ${user.organizationId}
+          AND company_id = ${id}
+          AND scope = 'COMPANY'
+          AND active = TRUE
+          AND (expires_at IS NULL OR expires_at > NOW())
+      `,
+      recommendedContactRecord
+        ? sql<{ actorName: string | null; createdAt: Date }[]>`
+            SELECT
+              u.name AS "actorName",
+              a.created_at AS "createdAt"
+            FROM sales_activities a
+            LEFT JOIN users u ON u.id = a.actor_id
+            WHERE a.organization_id = ${user.organizationId}
+              AND a.contact_id = ${recommendedContactRecord.id}
+              AND a.direction = 'OUTBOUND'
+              AND a.activity_status NOT IN ('PLANNED','CANCELLED')
+              AND a.actor_id IS DISTINCT FROM ${user.id}
+              AND a.created_at >= NOW() - (
+                COALESCE(
+                  (
+                    SELECT duplicate_warning_hours
+                    FROM contact_frequency_policies
+                    WHERE organization_id = ${user.organizationId}
+                    LIMIT 1
+                  ),
+                  48
+                ) || ' hours'
+              )::interval
+            ORDER BY a.created_at DESC
+            LIMIT 1
+          `
+        : Promise.resolve([] as { actorName: string | null; createdAt: Date }[]),
+    ]);
+
+  const isWatched = Boolean(watchEntry);
+  const companySuppressed = (activeCompanySuppression[0]?.count ?? 0) > 0;
+  const duplicateContactWarning = duplicateContact[0] ?? null;
+  const recommendedContactCanOutbound =
+    recommendedContactRecord !== null &&
+    ["CONTACT_PERMITTED", "EXISTING_RELATIONSHIP", "USER_CONFIRMED_CONSENT"].includes(
+      recommendedContactRecord.contactabilityStatus,
+    ) &&
+    !companySuppressed;
+
   const predictionDelta = salesOutcome
     ? predictionRealityDelta({
         predictedDealValue: salesOutcome.predictedDealValue,
@@ -738,7 +801,9 @@ export default async function CompanyIntelligencePage({
         <div className="nav-links">
           <Link href="/">Today</Link>
           <Link href="/discover">Discover</Link>
-          <Link className="nav-active" href="/companies">Companies</Link>
+          <Link className="nav-active" href="/companies">Search</Link>
+          <Link href="/watchlist">Watchlist</Link>
+          <Link href="/compliance">Compliance</Link>
           <Link href="/setup">Market Setup</Link>
           <Link href="/workspace">Workspace</Link>
         </div>
@@ -822,6 +887,24 @@ export default async function CompanyIntelligencePage({
         <div className="success-banner">
           Final sales outcome saved with prediction-vs-reality data.
         </div>
+      ) : null}
+      {query.watchlist ? (
+        <div className="success-banner">Watchlist updated.</div>
+      ) : null}
+      {query.assigned ? (
+        <div className="success-banner">Opportunity assigned to you.</div>
+      ) : null}
+      {query.feedback ? (
+        <div className="success-banner">Recommendation feedback recorded.</div>
+      ) : null}
+      {query.suppression ? (
+        <div className="success-banner">Suppression status updated.</div>
+      ) : null}
+      {query.consent ? (
+        <div className="success-banner">Contact permission record saved.</div>
+      ) : null}
+      {query.outreach_warning ? (
+        <div className="warning-banner">{query.outreach_warning}</div>
       ) : null}
 
       <section className="ai-research-card">
@@ -1439,8 +1522,207 @@ export default async function CompanyIntelligencePage({
           ) : null}
         </div>
 
-        <details className="m4-panel" open>
-          <summary>Lifecycle, owner and outcome</summary>
+        <section className="m5-quick-actions">
+          <div className="m5-quick-actions-heading">
+            <div>
+              <span className="field-label">M5 · Quick actions</span>
+              <strong>Only confirm what actually happened.</strong>
+              <p>
+                RevenueScout carries forward the company, Offering, owner,
+                recommended contact and stage automatically. Use the detailed
+                forms below only when you need to correct or add context.
+              </p>
+            </div>
+            <div className="m5-quick-status">
+              {isWatched ? <span>Watching</span> : null}
+              {companySuppressed ? <span>Suppressed</span> : null}
+            </div>
+          </div>
+
+          {duplicateContactWarning ? (
+            <div className="warning-banner m5-inline-warning">
+              {duplicateContactWarning.actorName ?? "Another team member"} contacted{" "}
+              {recommendedContactRecord?.name ?? "this contact"} on{" "}
+              {new Date(duplicateContactWarning.createdAt).toLocaleString("en-AU")}.
+              Check the activity history before contacting again.
+            </div>
+          ) : null}
+
+          <div className="m5-quick-grid">
+            {lifecycle.ownerUserId !== user.id ? (
+              <form
+                action={`/api/companies/${id}/assign-self`}
+                method="post"
+              >
+                <button className="m5-quick-button" type="submit">
+                  <span>Owner</span>
+                  <strong>Assign to me</strong>
+                </button>
+              </form>
+            ) : (
+              <div className="m5-quick-button m5-quick-done">
+                <span>Owner</span>
+                <strong>Assigned to you</strong>
+              </div>
+            )}
+
+            <form
+              action={`/api/companies/${id}/watchlist`}
+              method="post"
+            >
+              <input
+                type="hidden"
+                name="action"
+                value={isWatched ? "remove" : "add"}
+              />
+              <button className="m5-quick-button" type="submit">
+                <span>Timing</span>
+                <strong>{isWatched ? "Stop watching" : "Add to watchlist"}</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="OUTREACH" />
+              <input type="hidden" name="activityStatus" value="COMPLETED" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactCanOutbound}
+                title={
+                  recommendedContactCanOutbound
+                    ? "Record completed outreach"
+                    : "A named contact with an explicit permission state is required"
+                }
+              >
+                <span>Activity</span>
+                <strong>Contacted</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="FOLLOW_UP" />
+              <input type="hidden" name="activityStatus" value="COMPLETED" />
+              <input type="hidden" name="followUpSequence" value="1" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactCanOutbound}
+              >
+                <span>Activity</span>
+                <strong>Followed up</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="REPLY" />
+              <input type="hidden" name="activityStatus" value="REPLIED" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactRecord}
+              >
+                <span>Activity</span>
+                <strong>Reply received</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="MEETING" />
+              <input type="hidden" name="activityStatus" value="COMPLETED" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactRecord}
+              >
+                <span>Activity</span>
+                <strong>Meeting held</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="PROPOSAL" />
+              <input type="hidden" name="activityStatus" value="SENT" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactCanOutbound}
+              >
+                <span>Activity</span>
+                <strong>Proposal sent</strong>
+              </button>
+            </form>
+
+            {!companySuppressed ? (
+              <form action="/api/compliance/suppression" method="post">
+                <input type="hidden" name="scope" value="COMPANY" />
+                <input type="hidden" name="companyId" value={id} />
+                <input type="hidden" name="reason" value="DO_NOT_CONTACT" />
+                <input
+                  type="hidden"
+                  name="returnTo"
+                  value={`/companies/${id}`}
+                />
+                <button className="m5-quick-button m5-quick-danger" type="submit">
+                  <span>Safety</span>
+                  <strong>Do not contact</strong>
+                </button>
+              </form>
+            ) : (
+              <form action="/api/compliance/suppression" method="post">
+                <input type="hidden" name="action" value="clear" />
+                <input type="hidden" name="scope" value="COMPANY" />
+                <input type="hidden" name="companyId" value={id} />
+                <input type="hidden" name="reason" value="DO_NOT_CONTACT" />
+                <input
+                  type="hidden"
+                  name="returnTo"
+                  value={`/companies/${id}`}
+                />
+                <button className="m5-quick-button" type="submit">
+                  <span>Safety</span>
+                  <strong>Review suppression</strong>
+                </button>
+              </form>
+            )}
+          </div>
+
+          {!recommendedContactRecord ? (
+            <div className="m5-quick-hint">
+              No named contact is stored yet. Open <strong>Contacts</strong> below
+              only to add the person you actually found; RevenueScout will fill
+              the sales workflow around that person.
+            </div>
+          ) : !recommendedContactCanOutbound ? (
+            <div className="m5-quick-hint">
+              {recommendedContactRecord.name} is stored, but outbound contact is
+              not enabled. Only record a permission state when you have a real
+              basis for it.
+            </div>
+          ) : null}
+        </section>
+
+        <details className="m4-panel">
+          <summary>Advanced lifecycle / close Won or Lost</summary>
           <form
             className="m4-form"
             action={`/api/companies/${id}/lifecycle`}
@@ -1592,8 +1874,11 @@ export default async function CompanyIntelligencePage({
           </form>
         </details>
 
-        <details className="m4-panel" open={contacts.length === 0}>
-          <summary>Contacts ({contacts.length})</summary>
+        <details className="m4-panel">
+          <summary>
+            Contacts ({contacts.length}) · add/edit only when RevenueScout cannot
+            infer the person
+          </summary>
           {contacts.length > 0 ? (
             <div className="m4-contact-list">
               {contacts.map((contact) => (
@@ -1637,6 +1922,49 @@ export default async function CompanyIntelligencePage({
                       Contact source
                     </a>
                   ) : null}
+
+                  <details className="m5-permission-record">
+                    <summary>Record permission / withdrawal</summary>
+                    <form
+                      className="m5-permission-form"
+                      action="/api/compliance/consent"
+                      method="post"
+                    >
+                      <input type="hidden" name="contactId" value={contact.id} />
+                      <input
+                        type="hidden"
+                        name="returnTo"
+                        value={`/companies/${id}`}
+                      />
+                      <label>
+                        Record
+                        <select name="consentType" defaultValue="CONTACT_PERMITTED">
+                          <option value="CONTACT_PERMITTED">Contact permitted</option>
+                          <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
+                          <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
+                          <option value="WITHDRAWN">Permission withdrawn / stop requested</option>
+                        </select>
+                      </label>
+                      <label>
+                        Source
+                        <input
+                          name="source"
+                          placeholder="e.g. direct reply, existing customer record"
+                          required
+                        />
+                      </label>
+                      <label className="span-2">
+                        Note
+                        <input
+                          name="note"
+                          placeholder="Short factual basis for this record"
+                        />
+                      </label>
+                      <button className="secondary-button" type="submit">
+                        Save permission record
+                      </button>
+                    </form>
+                  </details>
 
                   <details className="m4-contact-edit">
                     <summary>Edit contact</summary>
@@ -1686,21 +2014,11 @@ export default async function CompanyIntelligencePage({
                           <option value="UNKNOWN">Unknown</option>
                         </select>
                       </label>
-                      <label>
-                        Contactability
-                        <select
-                          name="contactabilityStatus"
-                          defaultValue={contact.contactabilityStatus}
-                        >
-                          <option value="CONTACT_PERMITTED">Contact permitted</option>
-                          <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
-                          <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
-                          <option value="PUBLIC_BUSINESS_CONTACT">Public business contact</option>
-                          <option value="UNCERTAIN">Uncertain</option>
-                          <option value="DO_NOT_CONTACT">Do not contact</option>
-                          <option value="UNSUBSCRIBED">Unsubscribed</option>
-                        </select>
-                      </label>
+                      <input
+                        type="hidden"
+                        name="contactabilityStatus"
+                        value={contact.contactabilityStatus}
+                      />
                       <label>
                         Contact status
                         <select name="contactStatus" defaultValue={contact.contactStatus}>
@@ -1786,60 +2104,22 @@ export default async function CompanyIntelligencePage({
                 LinkedIn
                 <input name="linkedinUrl" type="url" />
               </label>
-              <label>
-                Location
-                <input name="location" />
-              </label>
-              <label>
-                Decision relevance
-                <select name="decisionRelevance" defaultValue="UNKNOWN">
-                  <option value="PRIMARY_DECISION_MAKER">Primary decision maker</option>
-                  <option value="DECISION_MAKER">Decision maker</option>
-                  <option value="INFLUENCER">Influencer</option>
-                  <option value="CHAMPION">Champion</option>
-                  <option value="PROCUREMENT">Procurement</option>
-                  <option value="TECHNICAL">Technical</option>
-                  <option value="GATEKEEPER">Gatekeeper</option>
-                  <option value="UNKNOWN">Unknown</option>
-                </select>
-              </label>
-              <label>
-                Contactability / compliance
-                <select name="contactabilityStatus" defaultValue="UNCERTAIN">
-                  <option value="UNCERTAIN">Uncertain</option>
-                  <option value="CONTACT_PERMITTED">Contact permitted</option>
-                  <option value="PUBLIC_BUSINESS_CONTACT">Public business contact</option>
-                  <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
-                  <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
-                  <option value="DO_NOT_CONTACT">Do not contact</option>
-                  <option value="UNSUBSCRIBED">Unsubscribed</option>
-                </select>
-              </label>
+              <input type="hidden" name="location" value="" />
+              <input type="hidden" name="decisionRelevance" value="UNKNOWN" />
+              <input type="hidden" name="contactabilityStatus" value="UNCERTAIN" />
               <input type="hidden" name="contactStatus" value="ACTIVE" />
-              <label>
-                Verification
-                <select name="verificationStatus" defaultValue="UNVERIFIED">
-                  <option value="CONFIRMED">Confirmed</option>
-                  <option value="LIKELY">Likely</option>
-                  <option value="UNVERIFIED">Unverified</option>
-                </select>
-              </label>
-              <label>
-                Confidence %
-                <input name="confidence" type="number" min="0" max="100" defaultValue="50" />
-              </label>
-              <label>
-                Source label
-                <input name="sourceLabel" defaultValue="Manual" />
-              </label>
-              <label>
-                Source URL
-                <input name="sourceUrl" type="url" />
-              </label>
+              <input type="hidden" name="verificationStatus" value="UNVERIFIED" />
+              <input type="hidden" name="confidence" value="50" />
+              <input type="hidden" name="sourceLabel" value="Manual" />
               <label className="span-2">
-                Notes
-                <textarea name="notes" />
+                Source URL
+                <input
+                  name="sourceUrl"
+                  type="url"
+                  placeholder="Optional page where you found this person"
+                />
               </label>
+              <input type="hidden" name="notes" value="" />
               <button className="primary-button" type="submit">
                 Add contact
               </button>
@@ -1847,8 +2127,10 @@ export default async function CompanyIntelligencePage({
           </div>
         </details>
 
-        <details className="m4-panel" open={salesActivities.length === 0}>
-          <summary>Sales activity ({salesActivities.length})</summary>
+        <details className="m4-panel">
+          <summary>
+            Detailed sales activity ({salesActivities.length}) · optional context
+          </summary>
           <div className="m4-activity-form-wrap">
             <form
               className="m4-form"

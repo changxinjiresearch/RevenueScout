@@ -132,7 +132,9 @@ export default async function SetupPage({
         <div className="nav-links">
           <Link href="/">Today</Link>
           <Link href="/discover">Discover</Link>
-          <Link href="/companies">Companies</Link>
+          <Link href="/companies">Search</Link>
+          <Link href="/watchlist">Watchlist</Link>
+          <Link href="/compliance">Compliance</Link>
           <Link className="nav-active" href="/setup">Market Setup</Link>
           <Link href="/workspace">Workspace</Link>
           <form action="/api/auth/logout" method="post">
