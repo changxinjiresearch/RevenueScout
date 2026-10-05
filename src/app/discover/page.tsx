@@ -365,6 +365,11 @@ export default async function DiscoverPage({
                       <form action="/api/discovery/import" method="post">
                         <input type="hidden" name="runId" value={run.id} />
                         <input type="hidden" name="candidateIndex" value={index} />
+                        <input
+                          type="hidden"
+                          name="candidateKey"
+                          value={candidate.providerRecordId}
+                        />
                         <button
                           className={lowPotential ? "secondary-button" : "primary-button"}
                           type="submit"
