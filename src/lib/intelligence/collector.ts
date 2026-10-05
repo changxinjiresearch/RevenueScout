@@ -313,6 +313,7 @@ async function resolveWebsite(input: {
   legalName?: string | null;
   website?: string | null;
   domain?: string | null;
+  allowDomainGuess?: boolean;
 }): Promise<{
   url: string;
   confidence: number;
@@ -345,6 +346,8 @@ async function resolveWebsite(input: {
       // Continue to zero-cost resolution candidates.
     }
   }
+
+  if (input.allowDomainGuess === false) return null;
 
   const names = [...new Set(
     [input.legalName, input.displayName].filter(Boolean) as string[],
@@ -387,6 +390,7 @@ export async function collectPublicPages(input: {
   domain?: string | null;
   evidenceUrls?: string[];
   maxPages?: number;
+  allowDomainGuess?: boolean;
 }): Promise<CollectorResult> {
   const maxPages = Math.max(1, Math.min(input.maxPages ?? 7, 10));
   const warnings: string[] = [];
@@ -408,7 +412,9 @@ export async function collectPublicPages(input: {
 
   if (!resolved?.url) {
     warnings.push(
-      "Official website could not be verified from stored data or zero-cost domain candidates.",
+      input.allowDomainGuess === false
+        ? "Official website was not available from a trusted source; speculative domain guessing was skipped in fast discovery."
+        : "Official website could not be verified from stored data or zero-cost domain candidates.",
     );
   }
 
