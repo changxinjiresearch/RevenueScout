@@ -108,18 +108,6 @@ export async function POST(request: NextRequest) {
           AND organization_id = ${user.organizationId}
       `;
 
-      await tx`
-        UPDATE suppression_entries
-        SET
-          active = FALSE,
-          cleared_by = ${user.id},
-          cleared_at = NOW()
-        WHERE organization_id = ${user.organizationId}
-          AND contact_id = ${contactId}
-          AND scope = 'CONTACT'
-          AND active = TRUE
-          AND reason IN ('DO_NOT_CONTACT','REQUESTED_STOP')
-      `;
     }
   });
 
