@@ -329,6 +329,7 @@ export async function addOfficialWebsiteEvidence(
       website: candidate.website,
       domain: candidate.domain,
       maxPages: 3,
+      allowDomainGuess: false,
     });
 
     if (!collected.officialWebsite || collected.pages.length === 0) {
