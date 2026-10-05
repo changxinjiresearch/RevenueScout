@@ -52,6 +52,10 @@ type SearchParams = {
   watchlist?: string;
   scoreMin?: string;
   revenueMin?: string;
+  employeeMin?: string;
+  employeeMax?: string;
+  lastContact?: string;
+  lastSignal?: string;
   sort?: string;
   error?: string;
   watchlist_status?: string;
@@ -200,6 +204,9 @@ export default async function CompaniesPage({
   const q = (params.q ?? "").trim().toLowerCase();
   const scoreMin = n(params.scoreMin);
   const revenueMin = n(params.revenueMin);
+  const employeeMin = n(params.employeeMin);
+  const employeeMax = n(params.employeeMax);
+  const nowMs = Date.now();
 
   let companies = allCompanies.filter((company) => {
     if (q && !company.searchText.includes(q)) return false;
@@ -224,6 +231,35 @@ export default async function CompaniesPage({
       revenueMin !== null &&
       (company.expectedRevenue === null || company.expectedRevenue < revenueMin)
     ) return false;
+    if (
+      employeeMin !== null &&
+      (company.employeeCount === null || company.employeeCount < employeeMin)
+    ) return false;
+    if (
+      employeeMax !== null &&
+      (company.employeeCount === null || company.employeeCount > employeeMax)
+    ) return false;
+
+    if (params.lastContact === "never" && company.lastContactAt) return false;
+    if (params.lastContact && params.lastContact !== "never") {
+      const days = Number(params.lastContact);
+      if (
+        !Number.isFinite(days) ||
+        !company.lastContactAt ||
+        nowMs - new Date(company.lastContactAt).getTime() > days * 86_400_000
+      ) return false;
+    }
+
+    if (params.lastSignal === "never" && company.latestSignalAt) return false;
+    if (params.lastSignal && params.lastSignal !== "never") {
+      const days = Number(params.lastSignal);
+      if (
+        !Number.isFinite(days) ||
+        !company.latestSignalAt ||
+        nowMs - new Date(company.latestSignalAt).getTime() > days * 86_400_000
+      ) return false;
+    }
+
     return true;
   });
 
@@ -401,6 +437,44 @@ export default async function CompaniesPage({
               min="0"
               defaultValue={params.revenueMin ?? ""}
             />
+          </label>
+          <label>
+            Minimum employees
+            <input
+              name="employeeMin"
+              type="number"
+              min="0"
+              defaultValue={params.employeeMin ?? ""}
+            />
+          </label>
+          <label>
+            Maximum employees
+            <input
+              name="employeeMax"
+              type="number"
+              min="0"
+              defaultValue={params.employeeMax ?? ""}
+            />
+          </label>
+          <label>
+            Last contact
+            <select name="lastContact" defaultValue={params.lastContact ?? ""}>
+              <option value="">Any</option>
+              <option value="7">Within 7 days</option>
+              <option value="30">Within 30 days</option>
+              <option value="90">Within 90 days</option>
+              <option value="never">Never contacted</option>
+            </select>
+          </label>
+          <label>
+            Last signal
+            <select name="lastSignal" defaultValue={params.lastSignal ?? ""}>
+              <option value="">Any</option>
+              <option value="7">Within 7 days</option>
+              <option value="30">Within 30 days</option>
+              <option value="90">Within 90 days</option>
+              <option value="never">No signal</option>
+            </select>
           </label>
           <label>
             Sort
