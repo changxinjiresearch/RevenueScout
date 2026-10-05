@@ -14,12 +14,13 @@ The frozen product specification and approved discovery amendment are stored at:
 - `docs/PRODUCT_SPEC_v1.3_DISCOVERY_VALIDATION_RECOVERY.md`
 - `docs/PRODUCT_SPEC_v1.4_ICP_GEOGRAPHY_AND_CORROBORATION.md`
 - `docs/PRODUCT_SPEC_v1.5_AU_LOGISTICS_SOURCE_EXPANSION.md`
+- `docs/PRODUCT_SPEC_v1.6_M3_OPPORTUNITY_INTELLIGENCE.md`
 
 All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
 ## Current development status
 
-M0, M1 and M2 are complete. M3 (Opportunity Intelligence) is the next formal milestone.
+M0, M1, M2 and M3 are complete. M4 (Contacts and Sales Lifecycle) is the next formal milestone.
 
 The current application includes:
 
@@ -42,6 +43,16 @@ The current application includes:
 - Current Potential, Evidence Confidence and Conservative/Upside Potential Range
 - Sales Priority, Research Priority and Value of Information
 - persisted, explainable company-research results and a production Today surface
+- immutable M3 opportunity score snapshots with configuration/input provenance
+- Why This Company, Why Now and explicitly-labelled Problem Hypothesis
+- deterministic Recommended Offering selection using ICP mapping, problem fit and deal economics
+- Low / Expected / High deal-value ranges
+- explainable pre-calibration conversion probability
+- probability-adjusted Expected Revenue and expected-revenue range
+- sales-effort and revenue-efficiency estimates
+- M3 ranking on Today
+- human priority / probability / deal-value / Offering / next-action overrides
+- append-only opportunity decision audit trail and snapshot history
 
 The default Intelligence Engine path does not require a paid AI/model/search API.
 
