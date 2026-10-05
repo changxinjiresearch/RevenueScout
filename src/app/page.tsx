@@ -549,6 +549,7 @@ export default async function Home({
               <Link className="status-pill" href="/discover">Discover</Link>
               <Link className="status-pill" href="/companies">Search</Link>
               <Link className="status-pill" href="/watchlist">Watchlist</Link>
+              <Link className="status-pill" href="/analytics">Analytics</Link>
               <Link className="status-pill" href="/compliance">Compliance</Link>
               <Link className="status-pill" href="/setup">Market Setup</Link>
               <Link className="status-pill" href="/workspace">Workspace</Link>

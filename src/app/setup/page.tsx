@@ -134,6 +134,7 @@ export default async function SetupPage({
           <Link href="/discover">Discover</Link>
           <Link href="/companies">Search</Link>
           <Link href="/watchlist">Watchlist</Link>
+          <Link href="/analytics">Analytics</Link>
           <Link href="/compliance">Compliance</Link>
           <Link className="nav-active" href="/setup">Market Setup</Link>
           <Link href="/workspace">Workspace</Link>

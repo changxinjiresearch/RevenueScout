@@ -208,12 +208,28 @@ Exit gate: **passed**. A salesperson can use RevenueScout as a daily work surfac
 
 ## M6 — Basic analytics
 
-- discovered/contacted/replied/meeting/opportunity/won funnel
-- expected vs actual revenue
-- signal performance
-- ICP performance
-- Offering performance
-- basic revenue attribution
+Status: **completed**
 
-Exit gate: the business can see whether RevenueScout recommendations actually
-create revenue.
+- selectable 30 / 90 / 365-day and all-time analytics windows
+- cohort-based Discovered → Qualified → Contacted → Replied → Meeting → Opportunity → Proposal → Won funnel
+- step conversion and from-start conversion rates with zero denominators kept unavailable rather than fabricated
+- current most valuable opportunities ranked by probability-adjusted Expected Revenue
+- current most likely-to-convert opportunities ranked by Conversion Probability
+- active-pipeline forecast separated into expected deal value, upside potential and probability-adjusted Expected Revenue
+- Expected Revenue vs Actual Won Revenue on closed outcomes
+- closed-deal audit preserving the original M3 probability, deal value and Expected Revenue next to the real outcome
+- probability evaluation using sample size, predicted-vs-actual win rate, Brier score, absolute probability error and calibration bins
+- explicit learning-readiness states; small samples remain pre-calibration and never silently relabel M3 as calibrated
+- Buying Signal performance across companies, Contacted, Meetings, Proposals, Won and actual revenue
+- ICP performance with origin-snapshot classification preferred where available
+- Offering performance with origin-snapshot recommendation preferred where available
+- primary-contact role outcome analysis
+- structured Lost Reason analytics
+- Revenue Attribution coverage and revenue by company acquisition source
+- last-12-month predicted-vs-actual revenue trend
+- Useful / Not useful recommendation feedback analytics
+- learning-readiness counts for probabilities, signals, ICPs and Offerings with Won ground truth
+- M6 query indexes over cohort dates, lifecycle timestamps, outcomes, signals, opportunity snapshots and feedback
+- Analytics is a first-class production navigation surface
+
+Exit gate: **passed**. The business can see whether RevenueScout recommendations actually create revenue, identify which signals / ICPs / Offerings are associated with outcomes, and measure M3 prediction error against real M4 Won/Lost ground truth without silently rewriting historical predictions.

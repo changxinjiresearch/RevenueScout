@@ -330,6 +330,7 @@ export default async function CompaniesPage({
           <Link href="/discover">Discover</Link>
           <Link className="nav-active" href="/companies">Search</Link>
           <Link href="/watchlist">Watchlist</Link>
+          <Link href="/analytics">Analytics</Link>
           <Link href="/compliance">Compliance</Link>
           <Link href="/setup">Market Setup</Link>
           <Link href="/workspace">Workspace</Link>

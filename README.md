@@ -17,12 +17,13 @@ The frozen product specification and approved discovery amendment are stored at:
 - `docs/PRODUCT_SPEC_v1.6_M3_OPPORTUNITY_INTELLIGENCE.md`
 - `docs/PRODUCT_SPEC_v1.7_M4_CONTACTS_SALES_LIFECYCLE.md`
 - `docs/PRODUCT_SPEC_v1.8_M5_DAILY_WORK_SURFACE.md`
+- `docs/PRODUCT_SPEC_v1.9_M6_BASIC_ANALYTICS.md`
 
 All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
 ## Current development status
 
-M0, M1, M2, M3, M4 and M5 are complete. M6 (Basic Analytics and revenue learning) is the next formal milestone.
+M0, M1, M2, M3, M4, M5 and M6 are complete. The core MVP milestone set is complete; later optimisation work should be driven by real user and Won/Lost data rather than by expanding scope by default.
 
 The current application includes:
 
@@ -81,6 +82,21 @@ The current application includes:
 - duplicate team-outreach warnings
 - hard suppression from Today and research queues
 - persisted Useful / Not useful recommendation feedback
+- M6 Analytics page with 30 / 90 / 365-day and all-time analysis windows
+- discovered → qualified → contacted → replied → meeting → opportunity → proposal → Won funnel with cohort and step conversion rates
+- current highest-Expected-Revenue and highest-conversion-probability opportunity rankings
+- live open-pipeline deal value, upside potential and probability-adjusted Expected Revenue forecast
+- closed Prediction vs Reality analysis using the original M3 snapshot captured before the outcome
+- probability evaluation with actual win rate, mean predicted probability, Brier score and calibration bins without falsely declaring a small sample calibrated
+- Signal Performance across companies, contacts, meetings, proposals, wins and actual revenue
+- ICP Performance using origin-prediction classifications where available
+- Offering Performance using origin-prediction recommendations where available
+- primary-contact role outcome analysis
+- structured Lost Reason analytics
+- Revenue Attribution and source-origin breakdown
+- last-12-month predicted-vs-actual revenue trend
+- recommendation feedback analytics
+- learning-readiness indicators showing when enough ground truth exists for a later versioned optimisation model
 
 The default Intelligence Engine path does not require a paid AI/model/search API.
 
