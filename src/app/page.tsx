@@ -498,7 +498,10 @@ export default async function Home() {
                     </p>
                   </div>
                   <span className="confidence">
-                    {opportunity.assessment.confidenceLabel} confidence
+                    {opportunity.m3
+                      ? `${opportunity.m3.conversionConfidence.toLowerCase()} conversion confidence`
+                      : `${opportunity.assessment.confidenceLabel} confidence`}
+                    {opportunity.m3?.hasHumanOverride ? " · human override" : ""}
                   </span>
                 </div>
 
@@ -524,7 +527,10 @@ export default async function Home() {
                   </div>
                   <div>
                     <span className="field-label">Recommended Offering</span>
-                    <p>{opportunity.recommendedOffering}</p>
+                    <p>
+                      {opportunity.m3?.effectiveOfferingName ??
+                        opportunity.recommendedOffering}
+                    </p>
                     {opportunity.offeringReason ? (
                       <small className="reason-note">{opportunity.offeringReason}</small>
                     ) : null}
@@ -545,7 +551,10 @@ export default async function Home() {
 
                 <div className="next-action">
                   <span className="field-label">Next best action</span>
-                  <strong>{opportunity.nextBestAction}</strong>
+                  <strong>
+                    {opportunity.m3?.effectiveNextBestAction ??
+                      opportunity.nextBestAction}
+                  </strong>
                   <span>Best person: {opportunity.recommendedContact}</span>
                 </div>
               </div>
@@ -577,11 +586,24 @@ export default async function Home() {
 
                 <div className="revenue-block">
                   <span>Expected Revenue</span>
-                  <strong>{money(opportunity.assessment.expectedRevenue)}</strong>
+                  <strong>
+                    {money(
+                      opportunity.m3?.effectiveExpectedRevenue ??
+                        opportunity.assessment.expectedRevenue,
+                    )}
+                  </strong>
                   <small>
-                    {Math.round(opportunity.conversionProbability * 100)}% ×{" "}
-                    {money(opportunity.expectedDealValue)}
+                    {opportunity.m3
+                      ? `${Math.round(opportunity.m3.effectiveConversionProbability * 1000) / 10}% × ${money(opportunity.m3.effectiveDealValue)}`
+                      : `${Math.round(opportunity.conversionProbability * 100)}% × ${money(opportunity.expectedDealValue)}`}
                   </small>
+                  {opportunity.m3 ? (
+                    <small>
+                      Deal range {money(opportunity.m3.dealValueLow)}–
+                      {money(opportunity.m3.dealValueHigh)} ·{" "}
+                      {opportunity.m3.salesEffort.toLowerCase()} sales effort
+                    </small>
+                  ) : null}
                 </div>
 
                 <details>
