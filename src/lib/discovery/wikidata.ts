@@ -5,6 +5,7 @@ import type {
   DiscoveryCandidate,
   DiscoveryEvidenceSource,
   DiscoveryProvider,
+  DiscoveryProviderIdentifier,
   DiscoveryQuery,
 } from "./types";
 
@@ -226,6 +227,137 @@ async function mapWithConcurrency<T, R>(
     ),
   );
   return output;
+}
+
+function normaliseCompanyName(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/\b(pty|ltd|limited|inc|llc|plc|corp|corporation|company|co)\b/g, " ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function companyNameSimilarity(a: string, b: string): number {
+  const left = new Set(normaliseCompanyName(a).split(" ").filter(Boolean));
+  const right = new Set(normaliseCompanyName(b).split(" ").filter(Boolean));
+  if (left.size === 0 || right.size === 0) return 0;
+
+  let intersection = 0;
+  for (const token of left) if (right.has(token)) intersection += 1;
+  const union = new Set([...left, ...right]).size;
+  return union ? intersection / union : 0;
+}
+
+export async function findWikidataCompanyEvidence(input: {
+  displayName: string;
+  legalName?: string | null;
+  country?: string | null;
+  semantics: string[];
+}): Promise<{
+  evidence: DiscoveryEvidenceSource;
+  identifier: DiscoveryProviderIdentifier;
+  website: string | null;
+  domain: string | null;
+} | null> {
+  const names = [
+    ...new Set(
+      [input.legalName, input.displayName]
+        .filter((value): value is string => Boolean(value?.trim()))
+        .map((value) => value.trim()),
+    ),
+  ];
+
+  const hitGroups = await mapWithConcurrency(
+    names,
+    2,
+    (name) => searchAll(name),
+  );
+
+  const hitsById = new Map<string, SearchHit>();
+  for (const hit of hitGroups.flat()) {
+    if (hit.id && !hitsById.has(hit.id)) hitsById.set(hit.id, hit);
+  }
+
+  const ids = [...hitsById.keys()].slice(0, 40);
+  if (ids.length === 0) return null;
+  const entities = await fetchEntities(ids);
+  const country = input.country?.trim().toUpperCase() || null;
+
+  let best:
+    | {
+        score: number;
+        id: string;
+        label: string;
+        description: string;
+        entity: Entity;
+        matched: string[];
+      }
+    | null = null;
+
+  for (const id of ids) {
+    const entity = entities.get(id);
+    const hit = hitsById.get(id);
+    if (!entity || !hit) continue;
+
+    const label =
+      entity.labels?.en?.value?.trim() || hit.label?.trim() || id;
+    const description =
+      entity.descriptions?.en?.value?.trim() ||
+      hit.description?.trim() ||
+      "";
+
+    if (!description || !looksLikeOrganisation(label, description)) continue;
+    if (!countryMatches(entity, description, country)) continue;
+
+    const similarity = Math.max(
+      ...names.map((name) => companyNameSimilarity(name, label)),
+    );
+    if (similarity < 0.6) continue;
+
+    // Only the descriptive text is allowed to support industry here. A keyword
+    // in the company name alone is not treated as direct industry evidence.
+    const matched = matchedIndustrySemantics(
+      description,
+      input.semantics,
+    );
+    if (matched.length === 0) continue;
+
+    const score = similarity + Math.min(0.25, matched.length * 0.03);
+    if (!best || score > best.score) {
+      best = { score, id, label, description, entity, matched };
+    }
+  }
+
+  if (!best) return null;
+
+  const website = stringClaim(best.entity, "P856");
+  const sourceUrl = `https://www.wikidata.org/wiki/${encodeURIComponent(best.id)}`;
+  const observedAt = new Date().toISOString();
+
+  return {
+    evidence: {
+      provider: "WIKIDATA",
+      providerRecordId: best.id,
+      sourceUrl,
+      sourceLabel: "Wikidata entity",
+      excerpt: best.description,
+      observedAt,
+      confidence: Math.min(0.88, 0.7 + Math.max(0, best.score - 0.6) * 0.2),
+      verificationStatus: "LIKELY",
+      sourceFamily: "wikidata.org",
+      matchedSemantics: best.matched,
+      supportsIndustry: true,
+    },
+    identifier: {
+      provider: "WIKIDATA",
+      identifierType: "WIKIDATA",
+      identifierValue: best.id,
+    },
+    website,
+    domain: safeDomain(website),
+  };
 }
 
 export async function searchWikidata(
