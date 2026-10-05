@@ -119,9 +119,11 @@ function looksLikeOrganisation(label: string, description: string): boolean {
 
 async function searchAll(search: string): Promise<SearchHit[]> {
   const hits: SearchHit[] = [];
+  const seenCursors = new Set<number>();
   let cursor: number | null = 0;
 
-  while (cursor !== null) {
+  while (cursor !== null && !seenCursors.has(cursor)) {
+    seenCursors.add(cursor);
     const url = new URL(API);
     url.searchParams.set("action", "wbsearchentities");
     url.searchParams.set("format", "json");
@@ -191,6 +193,41 @@ async function fetchEntities(ids: string[]): Promise<Map<string, Entity>> {
   return entities;
 }
 
+function safeDomain(website: string | null): string | null {
+  if (!website) return null;
+  try {
+    return new URL(website).hostname.toLowerCase().replace(/^www\./, "") || null;
+  } catch {
+    return null;
+  }
+}
+
+async function mapWithConcurrency<T, R>(
+  values: T[],
+  concurrency: number,
+  fn: (value: T) => Promise<R>,
+): Promise<R[]> {
+  const output = new Array<R>(values.length);
+  let cursor = 0;
+
+  async function worker() {
+    while (true) {
+      const index = cursor;
+      cursor += 1;
+      if (index >= values.length) return;
+      output[index] = await fn(values[index]);
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(Math.max(1, concurrency), values.length) },
+      () => worker(),
+    ),
+  );
+  return output;
+}
+
 export async function searchWikidata(
   query: DiscoveryQuery & { semantics?: string[] },
 ): Promise<DiscoveryCandidate[]> {
@@ -210,8 +247,10 @@ export async function searchWikidata(
     ),
   ];
 
-  const hitGroups = await Promise.all(
-    searchPhrases.map((phrase) => searchAll(phrase)),
+  const hitGroups = await mapWithConcurrency(
+    searchPhrases,
+    4,
+    (phrase) => searchAll(phrase),
   );
 
   const hitsById = new Map<string, SearchHit>();
@@ -265,7 +304,7 @@ export async function searchWikidata(
       displayName: label,
       legalName: label,
       website,
-      domain: website ? new URL(website).hostname.replace(/^www\./, "") : null,
+      domain: safeDomain(website),
       description: description || null,
       country,
       state: null,
