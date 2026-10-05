@@ -136,6 +136,13 @@ export function mapGleifRecord(record: GleifRecord): DiscoveryCandidate | null {
     observedAt,
     sourceConfidence: 0.98,
     verificationStatus: "CONFIRMED",
+    providerIdentifiers: [
+      {
+        provider: "GLEIF",
+        identifierType: "LEI",
+        identifierValue: lei,
+      },
+    ],
   };
 }
 
@@ -147,31 +154,45 @@ export async function searchGleif(
     throw new Error("Enter at least 2 characters to search.");
   }
 
-  const limit = Math.max(1, Math.min(query.limit ?? 10, 20));
-  const url = new URL(`${GLEIF_API}/lei-records`);
-  url.searchParams.set("filter[entity.legalName]", term);
-  url.searchParams.set("page[size]", String(limit));
+  const firstUrl = new URL(`${GLEIF_API}/lei-records`);
+  firstUrl.searchParams.set("filter[entity.legalName]", term);
+
+  // page[size] is a transport batch size, not a product result limit.
+  // Follow the provider's next link until the result set is exhausted.
+  firstUrl.searchParams.set("page[size]", "100");
 
   const country = query.country?.trim().toUpperCase();
   if (country) {
-    url.searchParams.set("filter[entity.legalAddress.country]", country);
+    firstUrl.searchParams.set("filter[entity.legalAddress.country]", country);
   }
 
-  const response = await fetch(url, {
-    headers: {
-      Accept: "application/vnd.api+json",
-      "User-Agent": "RevenueScout/0.2 (+https://revenuescout-web-production.up.railway.app)",
-    },
-    cache: "no-store",
-    signal: AbortSignal.timeout(10_000),
-  });
+  const records: GleifRecord[] = [];
+  let nextUrl: string | null = firstUrl.toString();
 
-  if (!response.ok) {
-    throw new Error(`GLEIF request failed with HTTP ${response.status}.`);
+  while (nextUrl) {
+    const response = await fetch(nextUrl, {
+      headers: {
+        Accept: "application/vnd.api+json",
+        "User-Agent":
+          "RevenueScout/0.3 (+https://revenuescout-web-production.up.railway.app)",
+      },
+      cache: "no-store",
+      signal: AbortSignal.timeout(10_000),
+    });
+
+    if (!response.ok) {
+      throw new Error(`GLEIF request failed with HTTP ${response.status}.`);
+    }
+
+    const payload = (await response.json()) as {
+      data?: GleifRecord[];
+      links?: { next?: string | null };
+    };
+    records.push(...(payload.data ?? []));
+    nextUrl = payload.links?.next ?? null;
   }
 
-  const payload = (await response.json()) as { data?: GleifRecord[] };
-  const candidates = (payload.data ?? [])
+  const candidates = records
     .map(mapGleifRecord)
     .filter((candidate): candidate is DiscoveryCandidate => candidate !== null);
 
