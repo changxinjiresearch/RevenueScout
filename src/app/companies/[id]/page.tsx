@@ -26,6 +26,11 @@ import {
   evidenceFreshness,
 } from "@/lib/evidence/freshness";
 import type { WebResearchResult } from "@/lib/enrichment/result-types";
+import {
+  applyOpportunityOverride,
+  createOrGetOpportunitySnapshot,
+  type OpportunityOverride,
+} from "@/lib/opportunities/service";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +65,14 @@ type Identifier = {
   identifierType: string;
   identifierValue: string;
   provider: string | null;
+};
+
+type AuditEvent = {
+  id: string;
+  eventType: "SNAPSHOT_CREATED" | "OVERRIDE_UPDATED" | "OVERRIDE_CLEARED";
+  note: string;
+  actorName: string | null;
+  createdAt: Date;
 };
 
 type ResearchRun = {
@@ -118,6 +131,7 @@ export default async function CompanyIntelligencePage({
     triaged?: string;
     research?: string;
     research_error?: string;
+    override?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -268,9 +282,13 @@ export default async function CompanyIntelligencePage({
         SELECT
           id,
           name,
+          description,
+          primary_problems AS "primaryProblems",
+          typical_customers AS "typicalCustomers",
           min_contract_value::float8 AS "minContractValue",
           avg_contract_value::float8 AS "avgContractValue",
-          ideal_contract_value::float8 AS "idealContractValue"
+          ideal_contract_value::float8 AS "idealContractValue",
+          sales_cycle_days AS "salesCycleDays"
         FROM offerings
         WHERE organization_id = ${user.organizationId}
       `,
