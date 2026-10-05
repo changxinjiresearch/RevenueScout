@@ -13,6 +13,7 @@ The frozen product specification and approved discovery amendment are stored at:
 - `docs/PRODUCT_SPEC_v1.2_PROGRESSIVE_DISCOVERY.md`
 - `docs/PRODUCT_SPEC_v1.3_DISCOVERY_VALIDATION_RECOVERY.md`
 - `docs/PRODUCT_SPEC_v1.4_ICP_GEOGRAPHY_AND_CORROBORATION.md`
+- `docs/PRODUCT_SPEC_v1.5_AU_LOGISTICS_SOURCE_EXPANSION.md`
 
 All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
@@ -34,6 +35,7 @@ The current application includes:
 - relative High / Medium / Research discovery priority with unknown fields kept non-negative
 - canonical ICP geography matching (for example Australia ↔ AU, VIC ↔ AU-VIC)
 - exact-company structured-source corroboration where independent evidence exists
+- Australian logistics association-directory corroboration across FTA/APSA, ATA, AFRA and ALC with source-role rules that prevent membership/name matches from overclaiming industry proof
 - GLEIF and Wikidata discovery inputs plus verified official-company-site evidence
 - RevenueScout Intelligence Engine v2
 - Claim cross-validation and source-independence analysis
