@@ -3,8 +3,16 @@ export type DiscoveryProviderId =
   | "GLEIF"
   | "WIKIDATA";
 
+export type DiscoveryEvidenceProvider =
+  | Exclude<DiscoveryProviderId, "MULTI_SOURCE">
+  | "OFFICIAL_WEBSITE"
+  | "FTA_APSA"
+  | "ATA"
+  | "AFRA"
+  | "ALC";
+
 export type DiscoveryEvidenceSource = {
-  provider: Exclude<DiscoveryProviderId, "MULTI_SOURCE"> | "OFFICIAL_WEBSITE";
+  provider: DiscoveryEvidenceProvider;
   providerRecordId?: string | null;
   sourceUrl: string;
   sourceLabel: string;
