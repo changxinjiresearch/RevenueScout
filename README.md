@@ -56,7 +56,7 @@ The current application includes:
 - append-only opportunity decision audit trail and snapshot history
 - persistent multi-contact company records with provenance and confidence
 - deterministic Recommended Contact selection with a visible "Why this person?" rationale
-- contactability / compliance status and outbound blocking for uncertain, do-not-contact and unsubscribed contacts
+- contactability / compliance status with outbound activity allowed only for explicit Contact Permitted, Existing Relationship or User-confirmed Consent states
 - opportunity ownership across workspace members
 - complete Discovered → Qualified → Contacted → Replied → Meeting → Opportunity → Proposal → Won/Lost lifecycle
 - structured outreach, follow-up, reply, meeting, proposal and note activity records
