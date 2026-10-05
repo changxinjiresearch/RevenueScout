@@ -1513,8 +1513,189 @@ export default async function CompanyIntelligencePage({
           ) : null}
         </div>
 
-        <details className="m4-panel" open>
-          <summary>Lifecycle, owner and outcome</summary>
+        <section className="m5-quick-actions">
+          <div className="m5-quick-actions-heading">
+            <div>
+              <span className="field-label">M5 · Quick actions</span>
+              <strong>Only confirm what actually happened.</strong>
+              <p>
+                RevenueScout carries forward the company, Offering, owner,
+                recommended contact and stage automatically. Use the detailed
+                forms below only when you need to correct or add context.
+              </p>
+            </div>
+            <div className="m5-quick-status">
+              {isWatched ? <span>Watching</span> : null}
+              {companySuppressed ? <span>Suppressed</span> : null}
+            </div>
+          </div>
+
+          {duplicateContactWarning ? (
+            <div className="warning-banner m5-inline-warning">
+              {duplicateContactWarning.actorName ?? "Another team member"} contacted{" "}
+              {recommendedContactRecord?.name ?? "this contact"} on{" "}
+              {new Date(duplicateContactWarning.createdAt).toLocaleString("en-AU")}.
+              Check the activity history before contacting again.
+            </div>
+          ) : null}
+
+          <div className="m5-quick-grid">
+            {lifecycle.ownerUserId !== user.id ? (
+              <form
+                action={`/api/companies/${id}/assign-self`}
+                method="post"
+              >
+                <button className="m5-quick-button" type="submit">
+                  <span>Owner</span>
+                  <strong>Assign to me</strong>
+                </button>
+              </form>
+            ) : (
+              <div className="m5-quick-button m5-quick-done">
+                <span>Owner</span>
+                <strong>Assigned to you</strong>
+              </div>
+            )}
+
+            <form
+              action={`/api/companies/${id}/watchlist`}
+              method="post"
+            >
+              <input
+                type="hidden"
+                name="action"
+                value={isWatched ? "remove" : "add"}
+              />
+              <button className="m5-quick-button" type="submit">
+                <span>Timing</span>
+                <strong>{isWatched ? "Stop watching" : "Add to watchlist"}</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="OUTREACH" />
+              <input type="hidden" name="activityStatus" value="COMPLETED" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactCanOutbound}
+                title={
+                  recommendedContactCanOutbound
+                    ? "Record completed outreach"
+                    : "A named contact with an explicit permission state is required"
+                }
+              >
+                <span>Activity</span>
+                <strong>Contacted</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="REPLY" />
+              <input type="hidden" name="activityStatus" value="REPLIED" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactRecord}
+              >
+                <span>Activity</span>
+                <strong>Reply received</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="MEETING" />
+              <input type="hidden" name="activityStatus" value="COMPLETED" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactRecord}
+              >
+                <span>Activity</span>
+                <strong>Meeting held</strong>
+              </button>
+            </form>
+
+            <form
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <input type="hidden" name="quick" value="1" />
+              <input type="hidden" name="activityType" value="PROPOSAL" />
+              <input type="hidden" name="activityStatus" value="SENT" />
+              <button
+                className="m5-quick-button"
+                type="submit"
+                disabled={!recommendedContactCanOutbound}
+              >
+                <span>Activity</span>
+                <strong>Proposal sent</strong>
+              </button>
+            </form>
+
+            {!companySuppressed ? (
+              <form action="/api/compliance/suppression" method="post">
+                <input type="hidden" name="scope" value="COMPANY" />
+                <input type="hidden" name="companyId" value={id} />
+                <input type="hidden" name="reason" value="DO_NOT_CONTACT" />
+                <input
+                  type="hidden"
+                  name="returnTo"
+                  value={`/companies/${id}`}
+                />
+                <button className="m5-quick-button m5-quick-danger" type="submit">
+                  <span>Safety</span>
+                  <strong>Do not contact</strong>
+                </button>
+              </form>
+            ) : (
+              <form action="/api/compliance/suppression" method="post">
+                <input type="hidden" name="action" value="clear" />
+                <input type="hidden" name="scope" value="COMPANY" />
+                <input type="hidden" name="companyId" value={id} />
+                <input type="hidden" name="reason" value="DO_NOT_CONTACT" />
+                <input
+                  type="hidden"
+                  name="returnTo"
+                  value={`/companies/${id}`}
+                />
+                <button className="m5-quick-button" type="submit">
+                  <span>Safety</span>
+                  <strong>Review suppression</strong>
+                </button>
+              </form>
+            )}
+          </div>
+
+          {!recommendedContactRecord ? (
+            <div className="m5-quick-hint">
+              No named contact is stored yet. Open <strong>Contacts</strong> below
+              only to add the person you actually found; RevenueScout will fill
+              the sales workflow around that person.
+            </div>
+          ) : !recommendedContactCanOutbound ? (
+            <div className="m5-quick-hint">
+              {recommendedContactRecord.name} is stored, but outbound contact is
+              not enabled. Only record a permission state when you have a real
+              basis for it.
+            </div>
+          ) : null}
+        </section>
+
+        <details className="m4-panel">
+          <summary>Advanced lifecycle / close Won or Lost</summary>
           <form
             className="m4-form"
             action={`/api/companies/${id}/lifecycle`}
@@ -1666,8 +1847,11 @@ export default async function CompanyIntelligencePage({
           </form>
         </details>
 
-        <details className="m4-panel" open={contacts.length === 0}>
-          <summary>Contacts ({contacts.length})</summary>
+        <details className="m4-panel">
+          <summary>
+            Contacts ({contacts.length}) · add/edit only when RevenueScout cannot
+            infer the person
+          </summary>
           {contacts.length > 0 ? (
             <div className="m4-contact-list">
               {contacts.map((contact) => (
@@ -1921,8 +2105,10 @@ export default async function CompanyIntelligencePage({
           </div>
         </details>
 
-        <details className="m4-panel" open={salesActivities.length === 0}>
-          <summary>Sales activity ({salesActivities.length})</summary>
+        <details className="m4-panel">
+          <summary>
+            Detailed sales activity ({salesActivities.length}) · optional context
+          </summary>
           <div className="m4-activity-form-wrap">
             <form
               className="m4-form"
