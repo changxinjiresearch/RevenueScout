@@ -59,7 +59,10 @@ describe("M4 sales lifecycle", () => {
     expect(canRecordOutboundContact("UNCERTAIN")).toBe(false);
     expect(canRecordOutboundContact("DO_NOT_CONTACT")).toBe(false);
     expect(canRecordOutboundContact("UNSUBSCRIBED")).toBe(false);
-    expect(canRecordOutboundContact("PUBLIC_BUSINESS_CONTACT")).toBe(true);
+    expect(canRecordOutboundContact("PUBLIC_BUSINESS_CONTACT")).toBe(false);
+    expect(canRecordOutboundContact("CONTACT_PERMITTED")).toBe(true);
+    expect(canRecordOutboundContact("EXISTING_RELATIONSHIP")).toBe(true);
+    expect(canRecordOutboundContact("USER_CONFIRMED_CONSENT")).toBe(true);
   });
 
   it("advances activity-driven lifecycle forward but never backwards or beyond closed stages", () => {
