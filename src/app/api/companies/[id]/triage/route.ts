@@ -39,6 +39,8 @@ export async function POST(
           company_id,
           stage,
           qualified_at,
+          origin_opportunity_snapshot_id,
+          origin_prediction_captured_at,
           stage_changed_at,
           updated_by,
           updated_at
@@ -47,6 +49,15 @@ export async function POST(
           ${user.organizationId},
           ${id},
           'QUALIFIED',
+          NOW(),
+          (
+            SELECT id
+            FROM opportunity_snapshots
+            WHERE organization_id = ${user.organizationId}
+              AND company_id = ${id}
+            ORDER BY created_at ASC
+            LIMIT 1
+          ),
           NOW(),
           NOW(),
           ${user.id},
@@ -62,6 +73,14 @@ export async function POST(
           qualified_at = COALESCE(
             company_sales_lifecycle.qualified_at,
             NOW()
+          ),
+          origin_opportunity_snapshot_id = COALESCE(
+            company_sales_lifecycle.origin_opportunity_snapshot_id,
+            EXCLUDED.origin_opportunity_snapshot_id
+          ),
+          origin_prediction_captured_at = COALESCE(
+            company_sales_lifecycle.origin_prediction_captured_at,
+            EXCLUDED.origin_prediction_captured_at
           ),
           stage_changed_at = CASE
             WHEN company_sales_lifecycle.stage = 'DISCOVERED'
