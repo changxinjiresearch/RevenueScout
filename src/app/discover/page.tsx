@@ -316,6 +316,11 @@ export default async function DiscoverPage({
                         {priority?.rationale[priority.rationale.length - 1] ??
                           precheck.reasons[0]}
                       </p>
+                      {priority?.failedFields.length ? (
+                        <p>
+                          Known ICP conflicts: {priority.failedFields.join(", ")}.
+                        </p>
+                      ) : null}
                       {priority?.missingFields.length ? (
                         <p>
                           Still unknown: {priority.missingFields.join(", ")}.
