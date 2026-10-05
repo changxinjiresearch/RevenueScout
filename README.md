@@ -16,12 +16,13 @@ The frozen product specification and approved discovery amendment are stored at:
 - `docs/PRODUCT_SPEC_v1.5_AU_LOGISTICS_SOURCE_EXPANSION.md`
 - `docs/PRODUCT_SPEC_v1.6_M3_OPPORTUNITY_INTELLIGENCE.md`
 - `docs/PRODUCT_SPEC_v1.7_M4_CONTACTS_SALES_LIFECYCLE.md`
+- `docs/PRODUCT_SPEC_v1.8_M5_DAILY_WORK_SURFACE.md`
 
 All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
 ## Current development status
 
-M0, M1, M2, M3 and M4 are complete. M5 (Today, Search, Watchlist and Compliance) is the next formal milestone.
+M0, M1, M2, M3, M4 and M5 are complete. M6 (Basic Analytics and revenue learning) is the next formal milestone.
 
 The current application includes:
 
@@ -65,6 +66,21 @@ The current application includes:
 - structured Lost Reasons
 - M3 prediction-vs-reality ground-truth snapshots for future calibration
 - M4 stage / owner / last-contact context on Today
+- M5 Today views for Mine, Due, Unassigned, Watchlist and lifecycle stage
+- Today sorting by opportunity, Expected Revenue, probability, score and next-action date
+- one-click Assign to me and Watch actions from Today
+- company-page quick actions for Contacted, Follow-up, Reply, Meeting and Proposal
+- long M4 data-entry forms moved behind advanced disclosures instead of being the default workflow
+- reduced new-contact entry to essential identity fields
+- workspace search across companies, contacts, opportunity explanations, notes, industries and locations
+- filters for geography, industry, size, score, signal, Expected Revenue, stage, owner, Last Contact, Last Signal, ICP, Offering and Watchlist
+- Watchlist work surface with latest signal and next action
+- organisation-wide company/contact suppression
+- explicit contact permission and withdrawal records
+- server-side contact/company outreach-frequency limits
+- duplicate team-outreach warnings
+- hard suppression from Today and research queues
+- persisted Useful / Not useful recommendation feedback
 
 The default Intelligence Engine path does not require a paid AI/model/search API.
 
