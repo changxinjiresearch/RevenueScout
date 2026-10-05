@@ -152,6 +152,16 @@ export async function POST(
   `;
 
   const currentStage: LifecycleStage = current?.stage ?? "DISCOVERED";
+  if (
+    direction === "OUTBOUND" &&
+    (currentStage === "DO_NOT_CONTACT" || currentStage === "SUPPRESSED")
+  ) {
+    return NextResponse.json(
+      { error: "Outbound contact is blocked by the company lifecycle status." },
+      { status: 409 },
+    );
+  }
+
   const isCompletedActivity =
     activityStatus !== "PLANNED" && activityStatus !== "CANCELLED";
   const suggested = isCompletedActivity
