@@ -117,6 +117,14 @@ function claimStatusText(status: string) {
   return "Unknown";
 }
 
+function money(value: number): string {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default async function CompanyIntelligencePage({
   params,
   searchParams,
@@ -319,6 +327,11 @@ export default async function CompanyIntelligencePage({
     LIMIT 1
   `;
 
+  const engineResult =
+    researchRun?.status === "COMPLETED"
+      ? researchRun.structuredResult
+      : null;
+
   const configured = buildConfiguredOpportunityFromCompany({
     company: company as CompanyRecord,
     evidence,
@@ -327,6 +340,61 @@ export default async function CompanyIntelligencePage({
     offerings,
     links,
   });
+
+  const opportunitySnapshot = await createOrGetOpportunitySnapshot({
+    organizationId: user.organizationId,
+    userId: user.id,
+    configVersion: user.configVersion,
+    company: company as CompanyRecord,
+    evidence,
+    signals,
+    icps,
+    offerings,
+    links,
+    m2SalesPriorityScore: engineResult?.salesPriorityScore ?? null,
+  });
+
+  const [opportunityOverride, auditEvents] = opportunitySnapshot
+    ? await Promise.all([
+        sql<OpportunityOverride[]>\`
+          SELECT
+            company_id AS "companyId",
+            priority_override AS "priorityOverride",
+            conversion_probability_override::float8 AS "conversionProbabilityOverride",
+            expected_deal_value_override::float8 AS "expectedDealValueOverride",
+            offering_id_override AS "offeringIdOverride",
+            next_best_action_override AS "nextBestActionOverride",
+            note,
+            updated_at AS "updatedAt"
+          FROM opportunity_overrides
+          WHERE organization_id = \${user.organizationId}
+            AND company_id = \${id}
+          LIMIT 1
+        \`,
+        sql<AuditEvent[]>\`
+          SELECT
+            a.id,
+            a.event_type AS "eventType",
+            a.note,
+            u.name AS "actorName",
+            a.created_at AS "createdAt"
+          FROM opportunity_audit_events a
+          LEFT JOIN users u ON u.id = a.actor_id
+          WHERE a.organization_id = \${user.organizationId}
+            AND a.company_id = \${id}
+          ORDER BY a.created_at DESC
+          LIMIT 8
+        \`,
+      ])
+    : [null, [] as AuditEvent[]];
+
+  const effectiveOpportunity = opportunitySnapshot
+    ? applyOpportunityOverride({
+        snapshot: opportunitySnapshot,
+        override: opportunityOverride ?? null,
+        offerings,
+      })
+    : null;
 
   const triage = assessCompanyTriage({
     company,
@@ -337,10 +405,6 @@ export default async function CompanyIntelligencePage({
 
   const primaryEvidence = evidence[0] ?? null;
   const lei = identifiers.find((item) => item.identifierType === "LEI");
-  const engineResult =
-    researchRun?.status === "COMPLETED"
-      ? researchRun.structuredResult
-      : null;
 
   const displayTriageStatus = engineResult
     ? engineResult.priorityAction === "CONTACT_NOW"
