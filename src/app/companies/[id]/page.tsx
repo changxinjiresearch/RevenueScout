@@ -506,6 +506,158 @@ export default async function CompanyIntelligencePage({
       })
     : null;
 
+  const [contacts, lifecycleRows, salesActivities, outcomeRows, workspaceMembers] =
+    await Promise.all([
+      sql<ContactView[]>`
+        SELECT
+          id,
+          name,
+          position,
+          email,
+          phone,
+          linkedin_url AS "linkedinUrl",
+          location,
+          decision_relevance AS "decisionRelevance",
+          contact_status AS "contactStatus",
+          contactability_status AS "contactabilityStatus",
+          source_url AS "sourceUrl",
+          source_label AS "sourceLabel",
+          confidence::float8 AS confidence,
+          verification_status AS "verificationStatus",
+          notes,
+          created_at AS "createdAt",
+          updated_at AS "updatedAt"
+        FROM contacts
+        WHERE organization_id = ${user.organizationId}
+          AND company_id = ${id}
+        ORDER BY
+          CASE decision_relevance
+            WHEN 'PRIMARY_DECISION_MAKER' THEN 1
+            WHEN 'DECISION_MAKER' THEN 2
+            WHEN 'CHAMPION' THEN 3
+            WHEN 'PROCUREMENT' THEN 4
+            ELSE 5
+          END,
+          updated_at DESC
+      `,
+      sql<SalesLifecycleView[]>`
+        SELECT
+          l.stage,
+          l.owner_user_id AS "ownerUserId",
+          owner.name AS "ownerName",
+          l.primary_contact_id AS "primaryContactId",
+          l.current_offering_id AS "currentOfferingId",
+          l.next_action AS "nextAction",
+          l.next_action_at AS "nextActionAt",
+          l.notes,
+          l.first_contact_at AS "firstContactAt",
+          l.last_contact_at AS "lastContactAt",
+          l.stage_changed_at AS "stageChangedAt",
+          l.updated_at AS "updatedAt"
+        FROM company_sales_lifecycle l
+        LEFT JOIN users owner ON owner.id = l.owner_user_id
+        WHERE l.organization_id = ${user.organizationId}
+          AND l.company_id = ${id}
+        LIMIT 1
+      `,
+      sql<SalesActivityView[]>`
+        SELECT
+          a.id,
+          a.contact_id AS "contactId",
+          c.name AS "contactName",
+          a.activity_type AS "activityType",
+          a.channel,
+          a.direction,
+          a.subject,
+          a.summary,
+          a.activity_status AS "activityStatus",
+          a.follow_up_sequence AS "followUpSequence",
+          a.next_action_at AS "nextActionAt",
+          u.name AS "actorName",
+          a.created_at AS "createdAt"
+        FROM sales_activities a
+        LEFT JOIN contacts c ON c.id = a.contact_id
+        LEFT JOIN users u ON u.id = a.actor_id
+        WHERE a.organization_id = ${user.organizationId}
+          AND a.company_id = ${id}
+        ORDER BY a.created_at DESC
+        LIMIT 30
+      `,
+      sql<SalesOutcomeView[]>`
+        SELECT
+          o.outcome,
+          o.opportunity_snapshot_id AS "opportunitySnapshotId",
+          o.predicted_opportunity_score AS "predictedOpportunityScore",
+          o.predicted_conversion_probability::float8 AS "predictedConversionProbability",
+          o.predicted_deal_value::float8 AS "predictedDealValue",
+          o.predicted_expected_revenue::float8 AS "predictedExpectedRevenue",
+          o.actual_contract_value::float8 AS "actualContractValue",
+          offering.name AS "actualOfferingName",
+          contact.name AS "primaryContactName",
+          o.lost_reason AS "lostReason",
+          o.lost_reason_note AS "lostReasonNote",
+          o.recommendation_source AS "recommendationSource",
+          o.sales_cycle_days AS "salesCycleDays",
+          o.closed_at AS "closedAt"
+        FROM sales_outcomes o
+        LEFT JOIN offerings offering ON offering.id = o.actual_offering_id
+        LEFT JOIN contacts contact ON contact.id = o.primary_contact_id
+        WHERE o.organization_id = ${user.organizationId}
+          AND o.company_id = ${id}
+        LIMIT 1
+      `,
+      sql<WorkspaceMember[]>`
+        SELECT
+          m.user_id AS "userId",
+          u.name,
+          u.email,
+          m.role
+        FROM memberships m
+        JOIN users u ON u.id = m.user_id
+        WHERE m.organization_id = ${user.organizationId}
+        ORDER BY
+          CASE m.role
+            WHEN 'OWNER' THEN 1
+            WHEN 'ADMIN' THEN 2
+            WHEN 'MANAGER' THEN 3
+            ELSE 4
+          END,
+          u.name
+      `,
+    ]);
+
+  const lifecycle: SalesLifecycleView = lifecycleRows[0] ?? {
+    stage: configured ? "QUALIFIED" : "DISCOVERED",
+    ownerUserId: null,
+    ownerName: null,
+    primaryContactId: null,
+    currentOfferingId: effectiveOpportunity?.effectiveOfferingId ?? null,
+    nextAction: effectiveOpportunity?.effectiveNextBestAction ?? "",
+    nextActionAt: null,
+    notes: "",
+    firstContactAt: null,
+    lastContactAt: null,
+    stageChangedAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const salesOutcome = outcomeRows[0] ?? null;
+  const recommendedContact = recommendContact(
+    contacts,
+    effectiveOpportunity?.recommendedContact ??
+      configured?.opportunity.recommendedContact ??
+      "Decision maker",
+  );
+  const recommendedContactRecord =
+    contacts.find((contact) => contact.id === recommendedContact.contactId) ?? null;
+  const predictionDelta = salesOutcome
+    ? predictionRealityDelta({
+        predictedDealValue: salesOutcome.predictedDealValue,
+        actualContractValue: salesOutcome.actualContractValue,
+        predictedProbability: salesOutcome.predictedConversionProbability,
+        outcome: salesOutcome.outcome,
+      })
+    : null;
+
   const triage = assessCompanyTriage({
     company,
     configured,
