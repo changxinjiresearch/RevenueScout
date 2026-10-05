@@ -36,7 +36,6 @@ type PriorityRun = {
   researchPriorityScore: number | null;
   valueOfInformationScore: number | null;
   priorityAction: string | null;
-  m3: EffectiveOpportunity | null;
 };
 
 type TodayItem = OpportunityInput & {
@@ -50,6 +49,7 @@ type TodayItem = OpportunityInput & {
   potentialScore: number | null;
   confidenceScore: number | null;
   priorityAction: string | null;
+  m3: EffectiveOpportunity | null;
 };
 
 type ResearchQueueItem = {
