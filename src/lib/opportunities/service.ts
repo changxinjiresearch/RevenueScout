@@ -280,6 +280,17 @@ export function applyOpportunityOverride(input: {
             ? 0
             : 1;
 
+  const revenueScale =
+    snapshot.expectedRevenue > 0
+      ? effectiveExpectedRevenue / snapshot.expectedRevenue
+      : effectiveExpectedRevenue > 0
+        ? 1
+        : 0;
+  const effectiveBaseRank =
+    snapshot.rankScore > 0
+      ? snapshot.rankScore * revenueScale
+      : effectiveExpectedRevenue;
+
   return {
     ...snapshot,
     override,
@@ -290,7 +301,7 @@ export function applyOpportunityOverride(input: {
     effectiveExpectedRevenue,
     effectiveNextBestAction:
       override?.nextBestActionOverride?.trim() || snapshot.nextBestAction,
-    effectiveRankScore: snapshot.rankScore * priorityMultiplier,
+    effectiveRankScore: effectiveBaseRank * priorityMultiplier,
     hasHumanOverride: Boolean(
       override &&
         (override.priorityOverride !== "AUTO" ||
