@@ -94,6 +94,45 @@ describe("ICP and Offering configuration", () => {
     expect(result.score).toBe(100);
   });
 
+  it("keeps missing ICP fields unknown instead of treating them as negative", () => {
+    const result = evaluateIcp(
+      {
+        ...company,
+        employeeCount: null,
+      },
+      icp,
+    );
+
+    expect(result.qualified).toBe(true);
+    expect(result.excluded).toBe(false);
+    expect(result.unknowns).toContain("Employee count");
+    expect(result.qualificationFailures).not.toContain(
+      "Employee count is outside the target range",
+    );
+    expect(result.score).toBeGreaterThan(0);
+  });
+
+  it("does not lower ICP Fit merely because a soft preference is unobserved", () => {
+    const withoutObservedGrowth = evaluateIcp(
+      {
+        ...company,
+        fastGrowth: false,
+        multiLocation: false,
+      },
+      {
+        ...icp,
+        fastGrowth: true,
+        multiLocation: true,
+      },
+    );
+
+    expect(withoutObservedGrowth.qualified).toBe(true);
+    expect(withoutObservedGrowth.score).toBe(100);
+    expect(withoutObservedGrowth.mismatches).toContain(
+      "Rapid growth not observed",
+    );
+  });
+
   it("enforces hard exclusions before ranking", () => {
     const result = evaluateIcp({ ...company, existingCustomer: true }, icp);
     expect(result.excluded).toBe(true);
@@ -143,6 +182,46 @@ describe("ICP and Offering configuration", () => {
     );
 
     expect(configured).toBeNull();
+  });
+
+  it("prefers problem-fit Offering over a larger but less relevant contract", () => {
+    const configured = configureOpportunity(
+      base,
+      { ...company, digitalNeed: true, multiLocation: true },
+      [icp],
+      [
+        {
+          id: "offering-automation",
+          name: "Workflow Automation",
+          description: "Automate operations workflows and process coordination",
+          primaryProblems: "manual process coordination",
+          typicalCustomers: "multi-location logistics teams",
+          minContractValue: 12000,
+          avgContractValue: 25000,
+          idealContractValue: 40000,
+        },
+        {
+          id: "offering-website",
+          name: "Premium Website Rebuild",
+          description: "Marketing website design",
+          primaryProblems: "brand presentation",
+          typicalCustomers: "consumer brands",
+          minContractValue: 30000,
+          avgContractValue: 60000,
+          idealContractValue: 90000,
+        },
+      ],
+      [
+        { offeringId: "offering-automation", icpId: "icp-1" },
+        { offeringId: "offering-website", icpId: "icp-1" },
+      ],
+    );
+
+    expect(configured?.offeringId).toBe("offering-automation");
+    expect(configured?.opportunity.recommendedOffering).toBe(
+      "Workflow Automation",
+    );
+    expect(configured?.offeringReason.toLowerCase()).toContain("problem");
   });
 
   it("uses linked Offering economics instead of demo deal value", () => {

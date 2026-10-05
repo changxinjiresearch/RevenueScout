@@ -17,6 +17,12 @@ import { assessOpportunity } from "@/lib/domain/opportunity-score";
 import type { OpportunityInput } from "@/lib/domain/types";
 import { db } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
+import {
+  applyOpportunityOverride,
+  createOrGetOpportunitySnapshot,
+  type EffectiveOpportunity,
+  type OpportunityOverride,
+} from "@/lib/opportunities/service";
 
 export const dynamic = "force-dynamic";
 
@@ -43,6 +49,7 @@ type TodayItem = OpportunityInput & {
   potentialScore: number | null;
   confidenceScore: number | null;
   priorityAction: string | null;
+  m3: EffectiveOpportunity | null;
 };
 
 type ResearchQueueItem = {
@@ -80,8 +87,16 @@ export default async function Home() {
     }
 
     const sql = db();
-    const [icps, offerings, links, companies, evidence, signals, priorityRuns] =
-      await Promise.all([
+    const [
+      icps,
+      offerings,
+      links,
+      companies,
+      evidence,
+      signals,
+      priorityRuns,
+      opportunityOverrides,
+    ] = await Promise.all([
         sql<IcpRule[]>`
           SELECT
             id,
@@ -121,9 +136,13 @@ export default async function Home() {
           SELECT
             id,
             name,
+            description,
+            primary_problems AS "primaryProblems",
+            typical_customers AS "typicalCustomers",
             min_contract_value::float8 AS "minContractValue",
             avg_contract_value::float8 AS "avgContractValue",
-            ideal_contract_value::float8 AS "idealContractValue"
+            ideal_contract_value::float8 AS "idealContractValue",
+            sales_cycle_days AS "salesCycleDays"
           FROM offerings
           WHERE organization_id = ${user.organizationId}
         `,
@@ -213,6 +232,19 @@ export default async function Home() {
             AND engine = 'REVENUESCOUT_INTELLIGENCE_V2'
           ORDER BY company_id, created_at DESC
         `,
+        sql<OpportunityOverride[]>`
+          SELECT
+            company_id AS "companyId",
+            priority_override AS "priorityOverride",
+            conversion_probability_override::float8 AS "conversionProbabilityOverride",
+            expected_deal_value_override::float8 AS "expectedDealValueOverride",
+            offering_id_override AS "offeringIdOverride",
+            next_best_action_override AS "nextBestActionOverride",
+            note,
+            updated_at AS "updatedAt"
+          FROM opportunity_overrides
+          WHERE organization_id = ${user.organizationId}
+        `,
       ]);
 
     storedCompanyCount = companies.length;
@@ -220,6 +252,9 @@ export default async function Home() {
     const salesCompanyIds = new Set<string>();
     const runByCompany = new Map(
       priorityRuns.map((run) => [run.companyId, run]),
+    );
+    const overrideByCompany = new Map(
+      opportunityOverrides.map((override) => [override.companyId, override]),
     );
 
     for (const company of companies) {
@@ -243,6 +278,26 @@ export default async function Home() {
       if (configured) {
         salesCompanyIds.add(company.id);
         const opportunity = configured.opportunity;
+        const snapshot = await createOrGetOpportunitySnapshot({
+          organizationId: user.organizationId,
+          userId: user.id,
+          configVersion: user.configVersion,
+          company,
+          evidence: companyEvidence,
+          signals: companySignals,
+          icps,
+          offerings,
+          links,
+          m2SalesPriorityScore: priorityRun?.salesPriorityScore ?? null,
+        });
+        const m3 = snapshot
+          ? applyOpportunityOverride({
+              snapshot,
+              override: overrideByCompany.get(company.id) ?? null,
+              offerings,
+            })
+          : null;
+
         configuredItems.push({
           ...opportunity,
           assessment: assessOpportunity(opportunity),
@@ -255,6 +310,7 @@ export default async function Home() {
           potentialScore: priorityRun?.potentialScore ?? null,
           confidenceScore: priorityRun?.confidenceScore ?? null,
           priorityAction: priorityRun?.priorityAction ?? null,
+          m3,
         });
       }
     }
@@ -314,18 +370,30 @@ export default async function Home() {
       potentialScore: null,
       confidenceScore: null,
       priorityAction: null,
+      m3: null,
     }));
+  }
+
+  function overrideOrder(item: TodayItem): number {
+    const priority = item.m3?.override?.priorityOverride ?? "AUTO";
+    if (priority === "HIGH") return 5;
+    if (priority === "MEDIUM") return 4;
+    if (priority === "AUTO") return 3;
+    if (priority === "LOW") return 2;
+    return 1;
   }
 
   items.sort(
     (a, b) =>
+      overrideOrder(b) - overrideOrder(a) ||
+      (b.m3?.effectiveRankScore ?? -1) - (a.m3?.effectiveRankScore ?? -1) ||
       (b.salesPriorityScore ?? -1) - (a.salesPriorityScore ?? -1) ||
-      b.assessment.expectedRevenue - a.assessment.expectedRevenue ||
       b.assessment.opportunityScore - a.assessment.opportunityScore,
   );
 
   const expectedRevenue = items.reduce(
-    (sum, item) => sum + item.assessment.expectedRevenue,
+    (sum, item) =>
+      sum + (item.m3?.effectiveExpectedRevenue ?? item.assessment.expectedRevenue),
     0,
   );
 
@@ -380,7 +448,7 @@ export default async function Home() {
         </div>
         <p>
           {user
-            ? `Ranked from ${storedCompanyCount} persisted company records. Completed Intelligence Engine v2 analyses use Sales Priority, while unanalysed records fall back to the legacy opportunity score.`
+            ? `Ranked from ${storedCompanyCount} persisted company records using M3 Expected Revenue, sales effort, confidence, M2 Sales Priority and any explicit human priority override.`
             : "This is synthetic demo data. Sign in to use persisted companies and traceable evidence."}
         </p>
       </section>
@@ -430,7 +498,10 @@ export default async function Home() {
                     </p>
                   </div>
                   <span className="confidence">
-                    {opportunity.assessment.confidenceLabel} confidence
+                    {opportunity.m3
+                      ? `${opportunity.m3.conversionConfidence.toLowerCase()} conversion confidence`
+                      : `${opportunity.assessment.confidenceLabel} confidence`}
+                    {opportunity.m3?.hasHumanOverride ? " · human override" : ""}
                   </span>
                 </div>
 
@@ -456,9 +527,16 @@ export default async function Home() {
                   </div>
                   <div>
                     <span className="field-label">Recommended Offering</span>
-                    <p>{opportunity.recommendedOffering}</p>
-                    {opportunity.offeringReason ? (
-                      <small className="reason-note">{opportunity.offeringReason}</small>
+                    <p>
+                      {opportunity.m3?.effectiveOfferingName ??
+                        opportunity.recommendedOffering}
+                    </p>
+                    {opportunity.m3?.effectiveOfferingReason ||
+                    opportunity.offeringReason ? (
+                      <small className="reason-note">
+                        {opportunity.m3?.effectiveOfferingReason ??
+                          opportunity.offeringReason}
+                      </small>
                     ) : null}
                   </div>
                 </div>
@@ -477,7 +555,10 @@ export default async function Home() {
 
                 <div className="next-action">
                   <span className="field-label">Next best action</span>
-                  <strong>{opportunity.nextBestAction}</strong>
+                  <strong>
+                    {opportunity.m3?.effectiveNextBestAction ??
+                      opportunity.nextBestAction}
+                  </strong>
                   <span>Best person: {opportunity.recommendedContact}</span>
                 </div>
               </div>
@@ -509,11 +590,30 @@ export default async function Home() {
 
                 <div className="revenue-block">
                   <span>Expected Revenue</span>
-                  <strong>{money(opportunity.assessment.expectedRevenue)}</strong>
+                  <strong>
+                    {money(
+                      opportunity.m3?.effectiveExpectedRevenue ??
+                        opportunity.assessment.expectedRevenue,
+                    )}
+                  </strong>
                   <small>
-                    {Math.round(opportunity.conversionProbability * 100)}% ×{" "}
-                    {money(opportunity.expectedDealValue)}
+                    {opportunity.m3
+                      ? `${Math.round(opportunity.m3.effectiveConversionProbability * 1000) / 10}% × ${money(opportunity.m3.effectiveDealValue)}`
+                      : `${Math.round(opportunity.conversionProbability * 100)}% × ${money(opportunity.expectedDealValue)}`}
                   </small>
+                  {opportunity.m3 ? (
+                    <>
+                      <small>
+                        Revenue range {money(opportunity.m3.expectedRevenueLow)}–
+                        {money(opportunity.m3.expectedRevenueHigh)}
+                      </small>
+                      <small>
+                        Deal range {money(opportunity.m3.dealValueLow)}–
+                        {money(opportunity.m3.dealValueHigh)} ·{" "}
+                        {opportunity.m3.salesEffort.toLowerCase()} sales effort
+                      </small>
+                    </>
+                  ) : null}
                 </div>
 
                 <details>
@@ -617,7 +717,7 @@ export default async function Home() {
 
       <footer className="disclaimer">
         {user
-          ? "Today separates Sales Priority from Research Priority. Intelligence Engine v2 treats missing data as unknown, validates commercial claims across independent source families, and keeps conversion estimates explicitly pre-calibration until real Won/Lost outcomes are available."
+          ? "Today combines M2 evidence intelligence with persisted M3 revenue opportunities. Missing data stays unknown, conversion estimates remain explicitly pre-calibration until real Won/Lost outcomes exist, and human overrides remain separate from the model snapshot."
           : "Demo mode uses synthetic fixtures only. No demo company should be interpreted as a real discovered business."}
       </footer>
     </main>

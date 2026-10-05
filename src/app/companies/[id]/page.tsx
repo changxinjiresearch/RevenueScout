@@ -26,6 +26,11 @@ import {
   evidenceFreshness,
 } from "@/lib/evidence/freshness";
 import type { WebResearchResult } from "@/lib/enrichment/result-types";
+import {
+  applyOpportunityOverride,
+  createOrGetOpportunitySnapshot,
+  type OpportunityOverride,
+} from "@/lib/opportunities/service";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +65,24 @@ type Identifier = {
   identifierType: string;
   identifierValue: string;
   provider: string | null;
+};
+
+type AuditEvent = {
+  id: string;
+  eventType: "SNAPSHOT_CREATED" | "OVERRIDE_UPDATED" | "OVERRIDE_CLEARED";
+  note: string;
+  actorName: string | null;
+  createdAt: Date;
+};
+
+type SnapshotHistory = {
+  id: string;
+  configVersion: number;
+  opportunityScore: number;
+  expectedRevenue: number;
+  conversionProbability: number;
+  offeringName: string | null;
+  createdAt: Date;
 };
 
 type ResearchRun = {
@@ -104,6 +127,14 @@ function claimStatusText(status: string) {
   return "Unknown";
 }
 
+function money(value: number): string {
+  return new Intl.NumberFormat("en-AU", {
+    style: "currency",
+    currency: "AUD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 export default async function CompanyIntelligencePage({
   params,
   searchParams,
@@ -118,6 +149,7 @@ export default async function CompanyIntelligencePage({
     triaged?: string;
     research?: string;
     research_error?: string;
+    override?: string;
   }>;
 }) {
   const user = await requireUser();
@@ -268,9 +300,13 @@ export default async function CompanyIntelligencePage({
         SELECT
           id,
           name,
+          description,
+          primary_problems AS "primaryProblems",
+          typical_customers AS "typicalCustomers",
           min_contract_value::float8 AS "minContractValue",
           avg_contract_value::float8 AS "avgContractValue",
-          ideal_contract_value::float8 AS "idealContractValue"
+          ideal_contract_value::float8 AS "idealContractValue",
+          sales_cycle_days AS "salesCycleDays"
         FROM offerings
         WHERE organization_id = ${user.organizationId}
       `,
@@ -301,6 +337,11 @@ export default async function CompanyIntelligencePage({
     LIMIT 1
   `;
 
+  const engineResult =
+    researchRun?.status === "COMPLETED"
+      ? researchRun.structuredResult
+      : null;
+
   const configured = buildConfiguredOpportunityFromCompany({
     company: company as CompanyRecord,
     evidence,
@@ -309,6 +350,83 @@ export default async function CompanyIntelligencePage({
     offerings,
     links,
   });
+
+  const opportunitySnapshot = await createOrGetOpportunitySnapshot({
+    organizationId: user.organizationId,
+    userId: user.id,
+    configVersion: user.configVersion,
+    company: company as CompanyRecord,
+    evidence,
+    signals,
+    icps,
+    offerings,
+    links,
+    m2SalesPriorityScore: engineResult?.salesPriorityScore ?? null,
+  });
+
+  const [opportunityOverrideRows, auditEvents, snapshotHistory] =
+    opportunitySnapshot
+      ? await Promise.all([
+        sql<OpportunityOverride[]>`
+          SELECT
+            company_id AS "companyId",
+            priority_override AS "priorityOverride",
+            conversion_probability_override::float8 AS "conversionProbabilityOverride",
+            expected_deal_value_override::float8 AS "expectedDealValueOverride",
+            offering_id_override AS "offeringIdOverride",
+            next_best_action_override AS "nextBestActionOverride",
+            note,
+            updated_at AS "updatedAt"
+          FROM opportunity_overrides
+          WHERE organization_id = ${user.organizationId}
+            AND company_id = ${id}
+          LIMIT 1
+        `,
+        sql<AuditEvent[]>`
+          SELECT
+            a.id,
+            a.event_type AS "eventType",
+            a.note,
+            u.name AS "actorName",
+            a.created_at AS "createdAt"
+          FROM opportunity_audit_events a
+          LEFT JOIN users u ON u.id = a.actor_id
+          WHERE a.organization_id = ${user.organizationId}
+            AND a.company_id = ${id}
+          ORDER BY a.created_at DESC
+          LIMIT 8
+        `,
+        sql<SnapshotHistory[]>`
+          SELECT
+            id,
+            config_version AS "configVersion",
+            opportunity_score AS "opportunityScore",
+            expected_revenue::float8 AS "expectedRevenue",
+            conversion_probability::float8 AS "conversionProbability",
+            offering_name AS "offeringName",
+            created_at AS "createdAt"
+          FROM opportunity_snapshots
+          WHERE organization_id = ${user.organizationId}
+            AND company_id = ${id}
+          ORDER BY created_at DESC
+          LIMIT 8
+        `,
+      ])
+      : [
+          [] as OpportunityOverride[],
+          [] as AuditEvent[],
+          [] as SnapshotHistory[],
+        ];
+
+  const opportunityOverride = opportunityOverrideRows[0] ?? null;
+
+  const effectiveOpportunity = opportunitySnapshot
+    ? applyOpportunityOverride({
+        snapshot: opportunitySnapshot,
+        override: opportunityOverride,
+        offerings,
+      })
+    : null;
 
   const triage = assessCompanyTriage({
     company,
@@ -319,10 +437,6 @@ export default async function CompanyIntelligencePage({
 
   const primaryEvidence = evidence[0] ?? null;
   const lei = identifiers.find((item) => item.identifierType === "LEI");
-  const engineResult =
-    researchRun?.status === "COMPLETED"
-      ? researchRun.structuredResult
-      : null;
 
   const displayTriageStatus = engineResult
     ? engineResult.priorityAction === "CONTACT_NOW"
@@ -413,6 +527,16 @@ export default async function CompanyIntelligencePage({
       {query.research_error ? (
         <div className="error-banner">
           RevenueScout Intelligence Engine failed. Open the analysis card below for the latest status.
+        </div>
+      ) : null}
+      {query.override === "saved" ? (
+        <div className="success-banner">
+          Human opportunity override saved and added to the audit trail.
+        </div>
+      ) : null}
+      {query.override === "cleared" ? (
+        <div className="success-banner">
+          Human override cleared. Opportunity ranking now uses the model output again.
         </div>
       ) : null}
 
@@ -690,6 +814,274 @@ export default async function CompanyIntelligencePage({
           </>
         ) : null}
       </section>
+
+      {effectiveOpportunity ? (
+        <section className="m3-opportunity-card">
+          <div className="m3-opportunity-heading">
+            <div>
+              <div className="eyebrow">M3 · Opportunity Intelligence</div>
+              <h2>Revenue opportunity</h2>
+              <p>
+                Persisted score snapshot #{effectiveOpportunity.snapshotId.slice(0, 8)} ·
+                Config v{effectiveOpportunity.configVersion} ·
+                {effectiveOpportunity.hasHumanOverride
+                  ? " human override active"
+                  : " model output"}
+              </p>
+            </div>
+            <div className="m3-rank-score">
+              <span>Opportunity score</span>
+              <strong>{effectiveOpportunity.opportunityScore}</strong>
+              <small>/100</small>
+            </div>
+          </div>
+
+          <div className="m3-metric-grid">
+            <div>
+              <span>Expected revenue</span>
+              <strong>{money(effectiveOpportunity.effectiveExpectedRevenue)}</strong>
+              <small>
+                {Math.round(effectiveOpportunity.effectiveConversionProbability * 1000) / 10}% ×{" "}
+                {money(effectiveOpportunity.effectiveDealValue)}
+              </small>
+              <small>
+                Model range {money(effectiveOpportunity.expectedRevenueLow)} –{" "}
+                {money(effectiveOpportunity.expectedRevenueHigh)}
+              </small>
+            </div>
+            <div>
+              <span>Estimated deal value</span>
+              <strong>{money(effectiveOpportunity.effectiveDealValue)}</strong>
+              <small>
+                Model range {money(effectiveOpportunity.dealValueLow)} –{" "}
+                {money(effectiveOpportunity.dealValueHigh)}
+              </small>
+            </div>
+            <div>
+              <span>Conversion probability</span>
+              <strong>
+                {Math.round(effectiveOpportunity.effectiveConversionProbability * 1000) / 10}%
+              </strong>
+              <small>
+                {effectiveOpportunity.calibrationState.replaceAll("_", " ")} ·{" "}
+                {effectiveOpportunity.conversionConfidence.toLowerCase()} confidence
+              </small>
+            </div>
+            <div>
+              <span>Revenue efficiency</span>
+              <strong>{money(effectiveOpportunity.revenueEfficiency)}</strong>
+              <small>{effectiveOpportunity.salesEffort.toLowerCase()} estimated sales effort</small>
+            </div>
+          </div>
+
+          <div className="m3-explanation-grid">
+            <div>
+              <span className="field-label">Why this company</span>
+              <p>{effectiveOpportunity.whyThisCompany}</p>
+            </div>
+            <div>
+              <span className="field-label">Why now</span>
+              <p>{effectiveOpportunity.whyNow}</p>
+            </div>
+            <div>
+              <span className="field-label">Problem hypothesis</span>
+              <p>
+                <strong>Hypothesis — not confirmed fact.</strong>{" "}
+                {effectiveOpportunity.problemHypothesis}
+              </p>
+            </div>
+            <div>
+              <span className="field-label">Recommended Offering</span>
+              <p><strong>{effectiveOpportunity.effectiveOfferingName}</strong></p>
+              <small>{effectiveOpportunity.effectiveOfferingReason}</small>
+            </div>
+          </div>
+
+          <div className="m3-next-action">
+            <span className="field-label">Next best action</span>
+            <strong>{effectiveOpportunity.effectiveNextBestAction}</strong>
+            <span>Recommended contact: {effectiveOpportunity.recommendedContact}</span>
+          </div>
+
+          <details className="m3-score-details">
+            <summary>Why this probability and score?</summary>
+            <div className="m3-score-detail-grid">
+              <dl className="score-breakdown">
+                {Object.entries(effectiveOpportunity.scoreBreakdown).map(
+                  ([label, score]) => (
+                    <div key={label}>
+                      <dt>{label}</dt>
+                      <dd>{Math.round(score)}</dd>
+                    </div>
+                  ),
+                )}
+              </dl>
+              <ul>
+                {effectiveOpportunity.conversionFactors.map((factor) => (
+                  <li key={factor}>{factor}</li>
+                ))}
+              </ul>
+            </div>
+          </details>
+
+          <details className="m3-override-panel" open={effectiveOpportunity.hasHumanOverride}>
+            <summary>
+              Human override {effectiveOpportunity.hasHumanOverride ? "· active" : ""}
+            </summary>
+            <p>
+              Overrides never erase the model snapshot. They change the effective
+              sales decision and are recorded in the audit trail.
+            </p>
+            <form
+              className="m3-override-form"
+              action={`/api/opportunities/${id}/override`}
+              method="post"
+            >
+              <label>
+                Priority
+                <select
+                  name="priorityOverride"
+                  defaultValue={effectiveOpportunity.override?.priorityOverride ?? "AUTO"}
+                >
+                  <option value="AUTO">Automatic</option>
+                  <option value="HIGH">High</option>
+                  <option value="MEDIUM">Medium</option>
+                  <option value="LOW">Low</option>
+                  <option value="HOLD">Hold</option>
+                </select>
+              </label>
+              <label>
+                Conversion probability %
+                <input
+                  name="conversionPercent"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  defaultValue={
+                    effectiveOpportunity.override?.conversionProbabilityOverride !== null &&
+                    effectiveOpportunity.override?.conversionProbabilityOverride !== undefined
+                      ? effectiveOpportunity.override.conversionProbabilityOverride * 100
+                      : ""
+                  }
+                  placeholder={String(
+                    Math.round(effectiveOpportunity.conversionProbability * 1000) / 10,
+                  )}
+                />
+              </label>
+              <label>
+                Expected deal value
+                <input
+                  name="expectedDealValue"
+                  type="number"
+                  min="0"
+                  step="1"
+                  defaultValue={
+                    effectiveOpportunity.override?.expectedDealValueOverride ?? ""
+                  }
+                  placeholder={String(effectiveOpportunity.dealValueExpected)}
+                />
+              </label>
+              <label>
+                Offering
+                <select
+                  name="offeringId"
+                  defaultValue={effectiveOpportunity.override?.offeringIdOverride ?? ""}
+                >
+                  <option value="">Use model recommendation</option>
+                  {offerings.map((offering) => (
+                    <option key={offering.id} value={offering.id}>
+                      {offering.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="span-2">
+                Next best action
+                <input
+                  name="nextBestAction"
+                  defaultValue={
+                    effectiveOpportunity.override?.nextBestActionOverride ?? ""
+                  }
+                  placeholder={effectiveOpportunity.nextBestAction}
+                />
+              </label>
+              <label className="span-2">
+                Override note
+                <textarea
+                  name="note"
+                  defaultValue={effectiveOpportunity.override?.note ?? ""}
+                  placeholder="Why are you overriding the model?"
+                />
+              </label>
+              <div className="span-2 form-actions">
+                <button className="primary-button" type="submit" name="action" value="save">
+                  Save override
+                </button>
+                {effectiveOpportunity.hasHumanOverride ? (
+                  <button className="secondary-button" type="submit" name="action" value="clear">
+                    Clear override
+                  </button>
+                ) : null}
+              </div>
+            </form>
+          </details>
+
+          <details className="m3-audit-panel">
+            <summary>Score snapshot history ({snapshotHistory.length})</summary>
+            {snapshotHistory.length === 0 ? (
+              <p>No historical snapshots yet.</p>
+            ) : (
+              <div className="m3-audit-list">
+                {snapshotHistory.map((snapshot) => (
+                  <div key={snapshot.id}>
+                    <strong>
+                      Score {snapshot.opportunityScore} ·{" "}
+                      {money(snapshot.expectedRevenue)} expected revenue
+                    </strong>
+                    <span>
+                      {Math.round(snapshot.conversionProbability * 1000) / 10}%
+                      conversion · Config v{snapshot.configVersion} ·{" "}
+                      {new Date(snapshot.createdAt).toLocaleString("en-AU")}
+                    </span>
+                    <p>{snapshot.offeringName ?? "No linked Offering"}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </details>
+
+          <details className="m3-audit-panel">
+            <summary>Decision audit trail ({auditEvents.length})</summary>
+            {auditEvents.length === 0 ? (
+              <p>No opportunity audit events yet.</p>
+            ) : (
+              <div className="m3-audit-list">
+                {auditEvents.map((event) => (
+                  <div key={event.id}>
+                    <strong>{event.eventType.replaceAll("_", " ")}</strong>
+                    <span>
+                      {event.actorName ?? "System"} ·{" "}
+                      {new Date(event.createdAt).toLocaleString("en-AU")}
+                    </span>
+                    <p>{event.note}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </details>
+        </section>
+      ) : (
+        <section className="m3-opportunity-card m3-opportunity-empty">
+          <div className="eyebrow">M3 · Opportunity Intelligence</div>
+          <h2>No qualified opportunity snapshot yet</h2>
+          <p>
+            This company currently has no eligible ICP match. Missing fields remain
+            unknown rather than negative; resolve the relevant evidence or adjust
+            Market Setup before RevenueScout creates a revenue opportunity.
+          </p>
+        </section>
+      )}
 
       <section className="triage-hero">
         <div className="triage-main">

@@ -1,14 +1,15 @@
-import type { OpportunityInput } from "@/lib/domain/types";
+import type { OpportunityInput } from "./types";
+import { geographyMatches } from "../discovery/geography";
 
 export interface CandidateCompanyFacts {
-  country: string;
-  state: string;
-  city: string;
-  industry: string;
-  subindustry: string;
-  employeeCount: number;
-  companyAgeYears: number;
-  companyType: string;
+  country: string | null;
+  state: string | null;
+  city: string | null;
+  industry: string | null;
+  subindustry: string | null;
+  employeeCount: number | null;
+  companyAgeYears: number | null;
+  companyType: string | null;
   serviceRegions: string[];
   fastGrowth: boolean;
   multiLocation: boolean;
@@ -60,9 +61,13 @@ export interface IcpRule {
 export interface OfferingConfig {
   id: string;
   name: string;
+  description?: string;
+  primaryProblems?: string;
+  typicalCustomers?: string;
   minContractValue: number | null;
   avgContractValue: number | null;
   idealContractValue: number | null;
+  salesCycleDays?: number | null;
 }
 
 export interface OfferingIcpLink {
@@ -78,6 +83,7 @@ export interface IcpMatch {
   excluded: boolean;
   reasons: string[];
   mismatches: string[];
+  unknowns: string[];
   qualificationFailures: string[];
   exclusionReasons: string[];
 }
@@ -90,18 +96,25 @@ export interface ConfiguredOpportunity {
   dealValueBasis: "minimum" | "average" | "ideal" | "none";
 }
 
-function normalise(value: string): string {
-  return value.trim().toLowerCase();
+function normalise(value: string | null | undefined): string {
+  return (value ?? "").trim().toLowerCase();
 }
 
-function includesValue(values: string[], candidate: string): boolean {
+function includesValue(
+  values: string[],
+  candidate: string | null | undefined,
+): boolean {
   const target = normalise(candidate);
-  return values.some((value) => normalise(value) === target);
+  return Boolean(target) && values.some((value) => normalise(value) === target);
 }
 
 function intersects(a: string[], b: string[]): boolean {
   const set = new Set(a.map(normalise));
   return b.some((value) => set.has(normalise(value)));
+}
+
+function hasText(value: string | null | undefined): value is string {
+  return Boolean(value?.trim());
 }
 
 export function evaluateIcp(
@@ -110,6 +123,7 @@ export function evaluateIcp(
 ): IcpMatch {
   const exclusionReasons: string[] = [];
   const qualificationFailures: string[] = [];
+  const unknowns: string[] = [];
 
   if (icp.excludeGovernment && company.entityType === "GOVERNMENT") {
     exclusionReasons.push("Government organisations are excluded");
@@ -127,6 +141,7 @@ export function evaluateIcp(
     exclusionReasons.push("Unsubscribed companies are excluded");
   }
   if (
+    company.employeeCount !== null &&
     icp.employeeExcludeBelow !== null &&
     company.employeeCount < icp.employeeExcludeBelow
   ) {
@@ -135,6 +150,7 @@ export function evaluateIcp(
     );
   }
   if (
+    company.employeeCount !== null &&
     icp.employeeExcludeAbove !== null &&
     company.employeeCount > icp.employeeExcludeAbove
   ) {
@@ -143,6 +159,7 @@ export function evaluateIcp(
     );
   }
   if (
+    hasText(company.industry) &&
     icp.excludedIndustries.length > 0 &&
     includesValue(icp.excludedIndustries, company.industry)
   ) {
@@ -154,21 +171,27 @@ export function evaluateIcp(
   const reasons: string[] = [];
   const mismatches: string[] = [];
 
-  const qualificationGate = (
-    configured: boolean,
-    passed: boolean,
-    weight: number,
-    success: string,
-    failure: string,
-  ) => {
-    if (!configured) return;
-    possible += weight;
+  const qualificationGate = (input: {
+    configured: boolean;
+    known: boolean;
+    passed: boolean;
+    weight: number;
+    success: string;
+    failure: string;
+    unknown: string;
+  }) => {
+    if (!input.configured) return;
+    if (!input.known) {
+      unknowns.push(input.unknown);
+      return;
+    }
 
-    if (passed) {
-      earned += weight;
-      reasons.push(success);
+    possible += input.weight;
+    if (input.passed) {
+      earned += input.weight;
+      reasons.push(input.success);
     } else {
-      qualificationFailures.push(failure);
+      qualificationFailures.push(input.failure);
     }
   };
 
@@ -180,87 +203,126 @@ export function evaluateIcp(
     failure: string,
   ) => {
     if (!configured) return;
-    possible += weight;
 
     if (passed) {
+      possible += weight;
       earned += weight;
       reasons.push(success);
     } else {
+      // These booleans mean "not observed" in the persisted company record,
+      // not a verified negative fact. Keep the gap visible without lowering
+      // ICP Fit merely because public evidence is sparse.
       mismatches.push(failure);
     }
   };
 
-  // Base company profile is a qualification gate. A company that misses one
-  // of these explicitly configured boundaries cannot compensate with softer
-  // signals such as hiring, growth or technology.
-  qualificationGate(
-    icp.countries.length > 0,
-    includesValue(icp.countries, company.country),
-    15,
-    `Country matches: ${company.country}`,
-    "Country does not match target countries",
-  );
-  qualificationGate(
-    icp.states.length > 0,
-    includesValue(icp.states, company.state),
-    8,
-    `State matches: ${company.state}`,
-    "State does not match target regions",
-  );
-  qualificationGate(
-    icp.cities.length > 0,
-    includesValue(icp.cities, company.city),
-    5,
-    `City matches: ${company.city}`,
-    "City does not match target cities",
-  );
-  qualificationGate(
-    icp.industries.length > 0,
-    includesValue(icp.industries, company.industry),
-    18,
-    `Industry matches: ${company.industry}`,
-    "Industry does not match target industries",
-  );
-  qualificationGate(
-    icp.subindustries.length > 0,
-    includesValue(icp.subindustries, company.subindustry),
-    7,
-    `Subindustry matches: ${company.subindustry}`,
-    "Subindustry does not match target subindustries",
-  );
-  qualificationGate(
-    icp.employeeMin !== null || icp.employeeMax !== null,
-    (icp.employeeMin === null || company.employeeCount >= icp.employeeMin) &&
-      (icp.employeeMax === null || company.employeeCount <= icp.employeeMax),
-    14,
-    `Employee count ${company.employeeCount} is in range`,
-    "Employee count is outside the target range",
-  );
-  qualificationGate(
-    icp.companyAgeMin !== null || icp.companyAgeMax !== null,
-    (icp.companyAgeMin === null || company.companyAgeYears >= icp.companyAgeMin) &&
-      (icp.companyAgeMax === null || company.companyAgeYears <= icp.companyAgeMax),
-    5,
-    "Company age is in range",
-    "Company age is outside the target range",
-  );
-  qualificationGate(
-    icp.companyTypes.length > 0,
-    includesValue(icp.companyTypes, company.companyType),
-    6,
-    `Company type matches: ${company.companyType}`,
-    "Company type does not match",
-  );
-  qualificationGate(
-    icp.serviceRegions.length > 0,
-    intersects(icp.serviceRegions, company.serviceRegions),
-    6,
-    "Service region overlaps the ICP",
-    "Service region does not overlap the ICP",
-  );
+  qualificationGate({
+    configured: icp.countries.length > 0,
+    known: hasText(company.country),
+    passed: geographyMatches(
+      icp.countries,
+      company.country,
+      "country",
+    ),
+    weight: 15,
+    success: `Country matches: ${company.country ?? "unknown"}`,
+    failure: "Country does not match target countries",
+    unknown: "Country",
+  });
 
-  // Dynamic / preference conditions improve fit but never rescue a company
-  // that failed the base qualification gate above.
+  qualificationGate({
+    configured: icp.states.length > 0,
+    known: hasText(company.state),
+    passed: geographyMatches(
+      icp.states,
+      company.state,
+      "region",
+      company.country,
+    ),
+    weight: 8,
+    success: `State matches: ${company.state ?? "unknown"}`,
+    failure: "State does not match target regions",
+    unknown: "State / region",
+  });
+
+  qualificationGate({
+    configured: icp.cities.length > 0,
+    known: hasText(company.city),
+    passed: includesValue(icp.cities, company.city),
+    weight: 5,
+    success: `City matches: ${company.city ?? "unknown"}`,
+    failure: "City does not match target cities",
+    unknown: "City",
+  });
+
+  qualificationGate({
+    configured: icp.industries.length > 0,
+    known: hasText(company.industry),
+    passed: includesValue(icp.industries, company.industry),
+    weight: 18,
+    success: `Industry matches: ${company.industry ?? "unknown"}`,
+    failure: "Industry does not match target industries",
+    unknown: "Industry",
+  });
+
+  qualificationGate({
+    configured: icp.subindustries.length > 0,
+    known: hasText(company.subindustry),
+    passed: includesValue(icp.subindustries, company.subindustry),
+    weight: 7,
+    success: `Subindustry matches: ${company.subindustry ?? "unknown"}`,
+    failure: "Subindustry does not match target subindustries",
+    unknown: "Subindustry",
+  });
+
+  qualificationGate({
+    configured: icp.employeeMin !== null || icp.employeeMax !== null,
+    known: company.employeeCount !== null,
+    passed:
+      company.employeeCount !== null &&
+      (icp.employeeMin === null || company.employeeCount >= icp.employeeMin) &&
+      (icp.employeeMax === null || company.employeeCount <= icp.employeeMax),
+    weight: 14,
+    success: `Employee count ${company.employeeCount ?? "unknown"} is in range`,
+    failure: "Employee count is outside the target range",
+    unknown: "Employee count",
+  });
+
+  qualificationGate({
+    configured: icp.companyAgeMin !== null || icp.companyAgeMax !== null,
+    known: company.companyAgeYears !== null,
+    passed:
+      company.companyAgeYears !== null &&
+      (icp.companyAgeMin === null ||
+        company.companyAgeYears >= icp.companyAgeMin) &&
+      (icp.companyAgeMax === null ||
+        company.companyAgeYears <= icp.companyAgeMax),
+    weight: 5,
+    success: "Company age is in range",
+    failure: "Company age is outside the target range",
+    unknown: "Company age",
+  });
+
+  qualificationGate({
+    configured: icp.companyTypes.length > 0,
+    known: hasText(company.companyType),
+    passed: includesValue(icp.companyTypes, company.companyType),
+    weight: 6,
+    success: `Company type matches: ${company.companyType ?? "unknown"}`,
+    failure: "Company type does not match",
+    unknown: "Company type",
+  });
+
+  qualificationGate({
+    configured: icp.serviceRegions.length > 0,
+    known: company.serviceRegions.length > 0,
+    passed: intersects(icp.serviceRegions, company.serviceRegions),
+    weight: 6,
+    success: "Service region overlaps the ICP",
+    failure: "Service region does not overlap the ICP",
+    unknown: "Service regions",
+  });
+
   preferenceCriterion(
     icp.fastGrowth,
     company.fastGrowth,
@@ -319,7 +381,9 @@ export function evaluateIcp(
   );
 
   if (icp.exclusions.trim()) {
-    reasons.push("Manual exclusion notes exist and remain visible for human review");
+    reasons.push(
+      "Manual exclusion notes exist and remain visible for human review",
+    );
   }
 
   const qualified = qualificationFailures.length === 0;
@@ -336,10 +400,12 @@ export function evaluateIcp(
     excluded,
     reasons,
     mismatches,
+    unknowns,
     qualificationFailures,
     exclusionReasons,
   };
 }
+
 export function findBestIcp(
   company: CandidateCompanyFacts,
   icps: IcpRule[],
@@ -349,23 +415,103 @@ export function findBestIcp(
     (match) => match.qualified && !match.excluded,
   );
 
-  return eligible.sort((a, b) => b.score - a.score)[0] ?? null;
+  return eligible.sort(
+    (a, b) =>
+      b.score - a.score ||
+      a.unknowns.length - b.unknowns.length,
+  )[0] ?? null;
+}
+
+function offeringFitScore(
+  company: CandidateCompanyFacts,
+  offering: OfferingConfig,
+): number {
+  const offeringText = normalise(
+    [
+      offering.name,
+      offering.description ?? "",
+      offering.primaryProblems ?? "",
+      offering.typicalCustomers ?? "",
+    ].join(" "),
+  );
+
+  const companyTerms = [
+    company.industry,
+    company.subindustry,
+    ...company.businessModels,
+    ...company.technologies,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .flatMap((value) => normalise(value).split(/\s+/))
+    .filter((value) => value.length >= 4);
+
+  let score = companyTerms.reduce(
+    (sum, term) => sum + (offeringText.includes(term) ? 3 : 0),
+    0,
+  );
+
+  if (
+    company.digitalNeed &&
+    /(automation|workflow|digital|software|system|integration|process)/.test(
+      offeringText,
+    )
+  ) {
+    score += 16;
+  }
+  if (
+    company.multiLocation &&
+    /(operations|workflow|coordination|integration|scheduling|automation)/.test(
+      offeringText,
+    )
+  ) {
+    score += 10;
+  }
+  if (
+    company.fastGrowth &&
+    /(growth|scale|scaling|automation|operations|workflow)/.test(offeringText)
+  ) {
+    score += 8;
+  }
+  if (
+    company.hiring &&
+    /(onboarding|workflow|operations|automation|workforce|process)/.test(
+      offeringText,
+    )
+  ) {
+    score += 5;
+  }
+
+  return score;
 }
 
 function chooseDealValue(
   company: CandidateCompanyFacts,
   offering: OfferingConfig,
-): { value: number; basis: "minimum" | "average" | "ideal"; dealPotential: number } {
+): {
+  value: number;
+  basis: "minimum" | "average" | "ideal";
+  dealPotential: number;
+} {
   if (
     company.fastGrowth &&
     company.multiLocation &&
     offering.idealContractValue !== null
   ) {
-    return { value: offering.idealContractValue, basis: "ideal", dealPotential: 85 };
+    return {
+      value: offering.idealContractValue,
+      basis: "ideal",
+      dealPotential: 85,
+    };
   }
+
   if (offering.avgContractValue !== null) {
-    return { value: offering.avgContractValue, basis: "average", dealPotential: 70 };
+    return {
+      value: offering.avgContractValue,
+      basis: "average",
+      dealPotential: 70,
+    };
   }
+
   return {
     value: offering.minContractValue ?? 0,
     basis: "minimum",
@@ -381,7 +527,9 @@ export function configureOpportunity(
   links: OfferingIcpLink[],
 ): ConfiguredOpportunity | null {
   const matchedIcp = findBestIcp(company, icps);
-  if (!matchedIcp || !matchedIcp.qualified || matchedIcp.excluded) return null;
+  if (!matchedIcp || !matchedIcp.qualified || matchedIcp.excluded) {
+    return null;
+  }
 
   const linkedOfferingIds = new Set(
     links
@@ -397,13 +545,25 @@ export function configureOpportunity(
     .map((offering) => ({
       offering,
       deal: chooseDealValue(company, offering),
+      fitScore: offeringFitScore(company, offering),
     }))
-    .sort((a, b) => b.deal.value - a.deal.value);
+    .sort(
+      (a, b) =>
+        b.fitScore - a.fitScore ||
+        b.deal.value - a.deal.value,
+    );
 
   const selected = ranked[0] ?? null;
+  const reasonParts = matchedIcp.reasons.slice(0, 3);
+  if (matchedIcp.unknowns.length > 0) {
+    reasonParts.push(
+      `Still unknown: ${matchedIcp.unknowns.slice(0, 3).join(", ")}`,
+    );
+  }
+
   const whyThisCompany =
-    matchedIcp.reasons.length > 0
-      ? `Best ICP match: ${matchedIcp.icpName}. ${matchedIcp.reasons.slice(0, 3).join(". ")}.`
+    reasonParts.length > 0
+      ? `Best ICP match: ${matchedIcp.icpName}. ${reasonParts.join(". ")}.`
       : `Best ICP match: ${matchedIcp.icpName}.`;
 
   if (!selected) {
@@ -428,8 +588,10 @@ export function configureOpportunity(
     offeringId: selected.offering.id,
     offeringReason:
       linkedOfferings.length === 1
-        ? `${selected.offering.name} is linked to ${matchedIcp.icpName}.`
-        : `${selected.offering.name} has the highest expected deal value among Offerings linked to ${matchedIcp.icpName}.`,
+        ? `${selected.offering.name} is explicitly linked to ${matchedIcp.icpName}.`
+        : selected.fitScore > 0
+          ? `${selected.offering.name} has the strongest problem/need fit among Offerings linked to ${matchedIcp.icpName}; deal economics break ties.`
+          : `${selected.offering.name} has the strongest configured deal-value basis among Offerings linked to ${matchedIcp.icpName}.`,
     dealValueBasis: selected.deal.basis,
     opportunity: {
       ...base,

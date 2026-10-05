@@ -2433,3 +2433,270 @@ select {
     text-align: left;
   }
 }
+
+
+/* M3 — Opportunity Intelligence */
+.m3-opportunity-card {
+  margin: 22px 0;
+  padding: 22px;
+  border: 1px solid #dfe6f2;
+  border-radius: 20px;
+  background: #ffffff;
+  box-shadow: 0 14px 34px rgba(50, 66, 98, 0.07);
+}
+
+.m3-opportunity-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.m3-opportunity-heading h2,
+.m3-opportunity-empty h2 {
+  margin: 4px 0 0;
+  color: #172033;
+}
+
+.m3-opportunity-heading p,
+.m3-opportunity-empty p {
+  margin: 7px 0 0;
+  color: #738097;
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.m3-rank-score {
+  min-width: 130px;
+  padding: 13px 15px;
+  border-radius: 15px;
+  background: #111b31;
+  color: #fff;
+  text-align: right;
+}
+
+.m3-rank-score span,
+.m3-rank-score small {
+  display: block;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  opacity: 0.72;
+}
+
+.m3-rank-score strong {
+  font-size: 30px;
+  line-height: 1.05;
+}
+
+.m3-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.m3-metric-grid > div {
+  display: grid;
+  gap: 5px;
+  padding: 14px;
+  border: 1px solid #e6eaf1;
+  border-radius: 14px;
+  background: #f9fbfe;
+}
+
+.m3-metric-grid span,
+.m3-metric-grid small {
+  color: #7f8a9d;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.m3-metric-grid strong {
+  color: #23314b;
+  font-size: 20px;
+}
+
+.m3-explanation-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.m3-explanation-grid > div {
+  padding: 15px;
+  border: 1px solid #e8ecf3;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.m3-explanation-grid p {
+  margin: 8px 0 0;
+  color: #56647a;
+  line-height: 1.55;
+  font-size: 12px;
+}
+
+.m3-explanation-grid small {
+  color: #7d8798;
+  line-height: 1.45;
+}
+
+.m3-next-action {
+  display: grid;
+  gap: 6px;
+  margin-top: 14px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  background: #eef4ff;
+}
+
+.m3-next-action strong {
+  color: #213963;
+}
+
+.m3-next-action span:last-child {
+  color: #6f7d92;
+  font-size: 11px;
+}
+
+.m3-score-details,
+.m3-override-panel,
+.m3-audit-panel {
+  margin-top: 14px;
+  border: 1px solid #e4e9f2;
+  border-radius: 14px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.m3-score-details > summary,
+.m3-override-panel > summary,
+.m3-audit-panel > summary {
+  cursor: pointer;
+  padding: 13px 14px;
+  color: #34425d;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.m3-score-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(0, 1.2fr);
+  gap: 16px;
+  padding: 0 14px 14px;
+}
+
+.m3-score-detail-grid ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #667287;
+  line-height: 1.5;
+  font-size: 11px;
+}
+
+.m3-override-panel > p {
+  margin: 0;
+  padding: 0 14px 12px;
+  color: #718096;
+  font-size: 11px;
+}
+
+.m3-override-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 0 14px 14px;
+}
+
+.m3-override-form label {
+  display: grid;
+  gap: 6px;
+  color: #4d5b72;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.m3-override-form input,
+.m3-override-form select,
+.m3-override-form textarea {
+  width: 100%;
+  border: 1px solid #dce3ee;
+  border-radius: 10px;
+  background: #fff;
+  padding: 10px 11px;
+  color: #27354d;
+  font: inherit;
+}
+
+.m3-override-form textarea {
+  min-height: 78px;
+  resize: vertical;
+}
+
+.m3-audit-list {
+  display: grid;
+  gap: 8px;
+  padding: 0 14px 14px;
+}
+
+.m3-audit-list > div {
+  padding: 11px 12px;
+  border: 1px solid #edf0f5;
+  border-radius: 11px;
+  background: #fafbfd;
+}
+
+.m3-audit-list strong {
+  display: block;
+  color: #33415b;
+  font-size: 11px;
+}
+
+.m3-audit-list span {
+  color: #8993a4;
+  font-size: 9px;
+}
+
+.m3-audit-list p {
+  margin: 5px 0 0;
+  color: #657187;
+  font-size: 10px;
+}
+
+.m3-opportunity-empty {
+  background: #fafbfd;
+}
+
+@media (max-width: 900px) {
+  .m3-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .m3-score-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 650px) {
+  .m3-opportunity-heading {
+    flex-direction: column;
+  }
+
+  .m3-rank-score {
+    width: 100%;
+    text-align: left;
+  }
+
+  .m3-metric-grid,
+  .m3-explanation-grid,
+  .m3-override-form {
+    grid-template-columns: 1fr;
+  }
+
+  .m3-override-form .span-2 {
+    grid-column: 1;
+  }
+}
