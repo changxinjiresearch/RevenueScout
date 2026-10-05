@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS company_sales_lifecycle (
   owner_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
   primary_contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
   current_offering_id UUID REFERENCES offerings(id) ON DELETE SET NULL,
+  origin_opportunity_snapshot_id UUID REFERENCES opportunity_snapshots(id) ON DELETE SET NULL,
+  origin_prediction_captured_at TIMESTAMPTZ,
   next_action TEXT NOT NULL DEFAULT '',
   next_action_at TIMESTAMPTZ,
   notes TEXT NOT NULL DEFAULT '',
