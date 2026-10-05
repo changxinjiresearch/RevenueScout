@@ -354,7 +354,7 @@ export default async function CompanyIntelligencePage({
     m2SalesPriorityScore: engineResult?.salesPriorityScore ?? null,
   });
 
-  const [opportunityOverride, auditEvents] = opportunitySnapshot
+  const [opportunityOverrideRows, auditEvents] = opportunitySnapshot
     ? await Promise.all([
         sql<OpportunityOverride[]>`
           SELECT
@@ -386,12 +386,14 @@ export default async function CompanyIntelligencePage({
           LIMIT 8
         `,
       ])
-    : [null, [] as AuditEvent[]];
+    : [[] as OpportunityOverride[], [] as AuditEvent[]];
+
+  const opportunityOverride = opportunityOverrideRows[0] ?? null;
 
   const effectiveOpportunity = opportunitySnapshot
     ? applyOpportunityOverride({
         snapshot: opportunitySnapshot,
-        override: opportunityOverride ?? null,
+        override: opportunityOverride,
         offerings,
       })
     : null;
