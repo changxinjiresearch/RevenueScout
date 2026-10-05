@@ -31,6 +31,14 @@ import {
   createOrGetOpportunitySnapshot,
   type OpportunityOverride,
 } from "@/lib/opportunities/service";
+import {
+  predictionRealityDelta,
+  recommendContact,
+  type ContactForRecommendation,
+  type ContactabilityStatus,
+  type DecisionRelevance,
+  type LifecycleStage,
+} from "@/lib/sales/lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -83,6 +91,73 @@ type SnapshotHistory = {
   conversionProbability: number;
   offeringName: string | null;
   createdAt: Date;
+};
+
+type ContactView = ContactForRecommendation & {
+  email: string | null;
+  phone: string | null;
+  linkedinUrl: string | null;
+  location: string | null;
+  sourceUrl: string | null;
+  sourceLabel: string;
+  notes: string;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+type SalesLifecycleView = {
+  stage: LifecycleStage;
+  ownerUserId: string | null;
+  ownerName: string | null;
+  primaryContactId: string | null;
+  currentOfferingId: string | null;
+  nextAction: string;
+  nextActionAt: Date | null;
+  notes: string;
+  firstContactAt: Date | null;
+  lastContactAt: Date | null;
+  stageChangedAt: Date;
+  updatedAt: Date;
+};
+
+type SalesActivityView = {
+  id: string;
+  contactId: string | null;
+  contactName: string | null;
+  activityType: string;
+  channel: string;
+  direction: string;
+  subject: string;
+  summary: string;
+  activityStatus: string;
+  followUpSequence: number;
+  nextActionAt: Date | null;
+  actorName: string | null;
+  createdAt: Date;
+};
+
+type SalesOutcomeView = {
+  outcome: "WON" | "LOST";
+  opportunitySnapshotId: string | null;
+  predictedOpportunityScore: number | null;
+  predictedConversionProbability: number | null;
+  predictedDealValue: number | null;
+  predictedExpectedRevenue: number | null;
+  actualContractValue: number | null;
+  actualOfferingName: string | null;
+  primaryContactName: string | null;
+  lostReason: string | null;
+  lostReasonNote: string;
+  recommendationSource: string;
+  salesCycleDays: number | null;
+  closedAt: Date;
+};
+
+type WorkspaceMember = {
+  userId: string;
+  name: string;
+  email: string;
+  role: string;
 };
 
 type ResearchRun = {
@@ -150,6 +225,9 @@ export default async function CompanyIntelligencePage({
     research?: string;
     research_error?: string;
     override?: string;
+    contact?: string;
+    activity?: string;
+    lifecycle?: string;
   }>;
 }) {
   const user = await requireUser();
