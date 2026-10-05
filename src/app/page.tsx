@@ -38,6 +38,15 @@ type PriorityRun = {
   priorityAction: string | null;
 };
 
+type TodayLifecycle = {
+  companyId: string;
+  stage: string;
+  ownerName: string | null;
+  lastContactAt: Date | null;
+  nextActionAt: Date | null;
+  nextAction: string;
+};
+
 type TodayItem = OpportunityInput & {
   assessment: ReturnType<typeof assessOpportunity>;
   matchedIcpName: string | null;
@@ -50,6 +59,7 @@ type TodayItem = OpportunityInput & {
   confidenceScore: number | null;
   priorityAction: string | null;
   m3: EffectiveOpportunity | null;
+  m4: TodayLifecycle | null;
 };
 
 type ResearchQueueItem = {
@@ -96,6 +106,7 @@ export default async function Home() {
       signals,
       priorityRuns,
       opportunityOverrides,
+      lifecycleRows,
     ] = await Promise.all([
         sql<IcpRule[]>`
           SELECT
@@ -245,6 +256,18 @@ export default async function Home() {
           FROM opportunity_overrides
           WHERE organization_id = ${user.organizationId}
         `,
+        sql<TodayLifecycle[]>`
+          SELECT
+            l.company_id AS "companyId",
+            l.stage,
+            owner.name AS "ownerName",
+            l.last_contact_at AS "lastContactAt",
+            l.next_action_at AS "nextActionAt",
+            l.next_action AS "nextAction"
+          FROM company_sales_lifecycle l
+          LEFT JOIN users owner ON owner.id = l.owner_user_id
+          WHERE l.organization_id = ${user.organizationId}
+        `,
       ]);
 
     storedCompanyCount = companies.length;
@@ -255,6 +278,9 @@ export default async function Home() {
     );
     const overrideByCompany = new Map(
       opportunityOverrides.map((override) => [override.companyId, override]),
+    );
+    const lifecycleByCompany = new Map(
+      lifecycleRows.map((lifecycle) => [lifecycle.companyId, lifecycle]),
     );
 
     for (const company of companies) {
@@ -311,6 +337,7 @@ export default async function Home() {
           confidenceScore: priorityRun?.confidenceScore ?? null,
           priorityAction: priorityRun?.priorityAction ?? null,
           m3,
+          m4: lifecycleByCompany.get(company.id) ?? null,
         });
       }
     }
@@ -371,6 +398,7 @@ export default async function Home() {
       confidenceScore: null,
       priorityAction: null,
       m3: null,
+      m4: null,
     }));
   }
 
