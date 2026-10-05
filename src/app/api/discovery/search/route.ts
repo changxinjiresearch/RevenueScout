@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
 
   const progress = discoveryProgress(state, 0);
   const sql = db();
-  const [run] = await sql<{ id: string }[]>\`
+  const [run] = await sql<{ id: string }[]>`
     INSERT INTO discovery_runs (
       organization_id,
       provider,
@@ -61,23 +61,23 @@ export async function POST(request: NextRequest) {
       created_by
     )
     VALUES (
-      \${user.organizationId},
-      \${provider.id},
-      \${offeringId},
-      \${icpId},
-      \${query},
-      \${country},
-      \${region},
+      ${user.organizationId},
+      ${provider.id},
+      ${offeringId},
+      ${icpId},
+      ${query},
+      ${country},
+      ${region},
       'RUNNING',
-      \${JSON.stringify(progress)}::text::jsonb,
-      \${JSON.stringify(state)}::text::jsonb,
-      \${user.id}
+      ${JSON.stringify(progress)}::text::jsonb,
+      ${JSON.stringify(state)}::text::jsonb,
+      ${user.id}
     )
     RETURNING id
-  \`;
+  `;
 
   return NextResponse.redirect(
-    publicUrl(request, \`/discover?run=\${run.id}\`),
+    publicUrl(request, `/discover?run=${run.id}`),
     303,
   );
 }
