@@ -379,7 +379,7 @@ async function addOfficialWebsiteEvidence(
   }
 }
 
-function validationFor(
+export function industryValidationForCandidate(
   candidate: DiscoveryCandidate,
   query: string,
 ): DiscoveryIndustryValidation | null {
@@ -474,7 +474,7 @@ export async function searchMultiSource(
   const validated: DiscoveryCandidate[] = [];
 
   for (const candidate of enriched) {
-    const validation = validationFor(candidate, query.query);
+    const validation = industryValidationForCandidate(candidate, query.query);
     if (!validation) continue;
 
     const sourceEvidence = candidate.sourceEvidence ?? [];
