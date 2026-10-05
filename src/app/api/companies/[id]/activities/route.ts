@@ -73,19 +73,35 @@ export async function POST(
     return NextResponse.json({ error: "Company not found." }, { status: 404 });
   }
 
-  const contactId = clean(formData.get("contactId")) || null;
+  const isQuick = clean(formData.get("quick")) === "1";
+  let contactId = clean(formData.get("contactId")) || null;
   const activityType = clean(formData.get("activityType")).toUpperCase();
-  const channel = clean(formData.get("channel")).toUpperCase() || "OTHER";
+  const defaultChannel =
+    activityType === "MEETING"
+      ? "MEETING"
+      : activityType === "NOTE"
+        ? "INTERNAL"
+        : "EMAIL";
+  const channel =
+    clean(formData.get("channel")).toUpperCase() ||
+    (isQuick ? defaultChannel : "OTHER");
   const requestedDirection =
-    clean(formData.get("direction")).toUpperCase() || "INTERNAL";
+    clean(formData.get("direction")).toUpperCase() ||
+    (isQuick ? "OUTBOUND" : "INTERNAL");
   const direction =
     activityType === "REPLY"
       ? "INBOUND"
       : activityType === "NOTE"
         ? "INTERNAL"
         : requestedDirection;
-  const subject = clean(formData.get("subject")).slice(0, 500);
-  const summary = clean(formData.get("summary")).slice(0, 5000);
+  const subject =
+    clean(formData.get("subject")).slice(0, 500) ||
+    (isQuick ? activityType.replaceAll("_", " ") : "");
+  const summary =
+    clean(formData.get("summary")).slice(0, 5000) ||
+    (isQuick
+      ? "Quick action recorded: " + activityType.replaceAll("_", " ").toLowerCase() + "."
+      : "");
   const activityStatus =
     clean(formData.get("activityStatus")).toUpperCase() || "COMPLETED";
   const sequenceRaw = Number(clean(formData.get("followUpSequence")) || "0");
@@ -106,6 +122,38 @@ export async function POST(
   if (!ACTIVITY_STATUS.has(activityStatus)) {
     return NextResponse.json({ error: "Invalid activity status." }, { status: 400 });
   }
+
+  if (isQuick && !contactId && activityType !== "NOTE") {
+    const [preferredContact] = await sql<{ id: string }[]>`
+      SELECT c.id
+      FROM contacts c
+      LEFT JOIN company_sales_lifecycle l
+        ON l.organization_id = c.organization_id
+       AND l.company_id = c.company_id
+      WHERE c.organization_id = ${user.organizationId}
+        AND c.company_id = ${companyId}
+        AND c.contact_status = 'ACTIVE'
+      ORDER BY
+        CASE WHEN c.id = l.primary_contact_id THEN 0 ELSE 1 END,
+        CASE c.contactability_status
+          WHEN 'EXISTING_RELATIONSHIP' THEN 1
+          WHEN 'USER_CONFIRMED_CONSENT' THEN 2
+          WHEN 'CONTACT_PERMITTED' THEN 3
+          ELSE 4
+        END,
+        CASE c.decision_relevance
+          WHEN 'PRIMARY_DECISION_MAKER' THEN 1
+          WHEN 'DECISION_MAKER' THEN 2
+          WHEN 'CHAMPION' THEN 3
+          ELSE 4
+        END,
+        c.confidence DESC,
+        c.updated_at DESC
+      LIMIT 1
+    `;
+    contactId = preferredContact?.id ?? null;
+  }
+
   if (!summary && activityType !== "NOTE") {
     return NextResponse.json({ error: "Activity summary is required." }, { status: 400 });
   }
@@ -404,7 +452,8 @@ export async function POST(
     `;
   });
 
-  const url = publicUrl(request, "/companies/" + companyId);
+  const returnTo = clean(formData.get("returnTo")) || "/companies/" + companyId;
+  const url = publicUrl(request, returnTo);
   url.searchParams.set("activity", "recorded");
   if (outreachWarning) {
     url.searchParams.set("outreach_warning", outreachWarning);
