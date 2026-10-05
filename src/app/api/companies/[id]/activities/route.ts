@@ -240,36 +240,60 @@ export async function POST(
         sql<{ count: number }[]>`
           SELECT COUNT(*)::int AS count
           FROM sales_activities a
-          JOIN contact_frequency_policies p
-            ON p.organization_id = a.organization_id
           WHERE a.organization_id = ${user.organizationId}
             AND a.contact_id = ${contact.id}
             AND a.direction = 'OUTBOUND'
             AND a.activity_status NOT IN ('PLANNED','CANCELLED')
-            AND a.created_at >= NOW() - (p.contact_window_days || ' days')::interval
+            AND a.created_at >= NOW() - (
+              COALESCE(
+                (
+                  SELECT contact_window_days
+                  FROM contact_frequency_policies
+                  WHERE organization_id = ${user.organizationId}
+                  LIMIT 1
+                ),
+                7
+              ) || ' days'
+            )::interval
         `,
         sql<{ count: number }[]>`
           SELECT COUNT(*)::int AS count
           FROM sales_activities a
-          JOIN contact_frequency_policies p
-            ON p.organization_id = a.organization_id
           WHERE a.organization_id = ${user.organizationId}
             AND a.company_id = ${companyId}
             AND a.direction = 'OUTBOUND'
             AND a.activity_status NOT IN ('PLANNED','CANCELLED')
-            AND a.created_at >= NOW() - (p.company_window_days || ' days')::interval
+            AND a.created_at >= NOW() - (
+              COALESCE(
+                (
+                  SELECT company_window_days
+                  FROM contact_frequency_policies
+                  WHERE organization_id = ${user.organizationId}
+                  LIMIT 1
+                ),
+                14
+              ) || ' days'
+            )::interval
         `,
         sql<{ createdAt: Date }[]>`
           SELECT a.created_at AS "createdAt"
           FROM sales_activities a
-          JOIN contact_frequency_policies p
-            ON p.organization_id = a.organization_id
           WHERE a.organization_id = ${user.organizationId}
             AND a.contact_id = ${contact.id}
             AND a.direction = 'OUTBOUND'
             AND a.activity_status NOT IN ('PLANNED','CANCELLED')
             AND a.actor_id IS DISTINCT FROM ${user.id}
-            AND a.created_at >= NOW() - (p.duplicate_warning_hours || ' hours')::interval
+            AND a.created_at >= NOW() - (
+              COALESCE(
+                (
+                  SELECT duplicate_warning_hours
+                  FROM contact_frequency_policies
+                  WHERE organization_id = ${user.organizationId}
+                  LIMIT 1
+                ),
+                48
+              ) || ' hours'
+            )::interval
           ORDER BY a.created_at DESC
           LIMIT 1
         `,
