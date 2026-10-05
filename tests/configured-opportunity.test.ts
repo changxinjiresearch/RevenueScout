@@ -94,6 +94,24 @@ describe("ICP and Offering configuration", () => {
     expect(result.score).toBe(100);
   });
 
+  it("keeps missing ICP fields unknown instead of treating them as negative", () => {
+    const result = evaluateIcp(
+      {
+        ...company,
+        employeeCount: null,
+      },
+      icp,
+    );
+
+    expect(result.qualified).toBe(true);
+    expect(result.excluded).toBe(false);
+    expect(result.unknowns).toContain("Employee count");
+    expect(result.qualificationFailures).not.toContain(
+      "Employee count is outside the target range",
+    );
+    expect(result.score).toBeGreaterThan(0);
+  });
+
   it("enforces hard exclusions before ranking", () => {
     const result = evaluateIcp({ ...company, existingCustomer: true }, icp);
     expect(result.excluded).toBe(true);
