@@ -51,11 +51,15 @@ A contact has an explicit contactability state:
 RevenueScout MUST NOT treat the existence of an email address as permission to
 contact.
 
-At M4, outbound activity recording is blocked for:
+At M4, outbound activity recording is allowed only for:
 
-- Uncertain;
-- Do Not Contact;
-- Unsubscribed.
+- Contact permitted;
+- Existing relationship;
+- User-confirmed consent.
+
+A public business address is retained as provenance but is not, by itself,
+treated as permission to contact. All other contactability states are blocked
+for outbound activity recording.
 
 Organisation-wide suppression and duplicate-outreach policy remain M5 scope.
 
