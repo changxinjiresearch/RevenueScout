@@ -1,4 +1,4 @@
-import { collectPublicPages } from "@/lib/intelligence/collector";
+import { collectPublicPages } from "../intelligence/collector";
 import { searchGleif } from "./gleif";
 import {
   canonicalIndustryLabel,
