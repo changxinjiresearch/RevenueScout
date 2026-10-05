@@ -152,13 +152,15 @@ export async function POST(
       firstContactAt: Date | null;
       ownerUserId: string | null;
       primaryContactId: string | null;
+      originOpportunitySnapshotId: string | null;
     }[]
   >`
     SELECT
       stage,
       first_contact_at AS "firstContactAt",
       owner_user_id AS "ownerUserId",
-      primary_contact_id AS "primaryContactId"
+      primary_contact_id AS "primaryContactId",
+      origin_opportunity_snapshot_id AS "originOpportunitySnapshotId"
     FROM company_sales_lifecycle
     WHERE organization_id = ${user.organizationId}
       AND company_id = ${companyId}
@@ -169,7 +171,7 @@ export async function POST(
   const closedAt = stage === "WON" || stage === "LOST" ? new Date() : null;
   const relationshipStatus = relationshipStatusForStage(stage);
 
-  const [latestSnapshot] = await sql<
+  const [predictionSnapshot] = await sql<
     {
       id: string;
       opportunityScore: number;
@@ -193,12 +195,17 @@ export async function POST(
     FROM opportunity_snapshots
     WHERE organization_id = ${user.organizationId}
       AND company_id = ${companyId}
-    ORDER BY created_at DESC
+    ORDER BY
+      CASE
+        WHEN id = ${current?.originOpportunitySnapshotId ?? null} THEN 0
+        ELSE 1
+      END,
+      created_at DESC
     LIMIT 1
   `;
 
   const resolvedActualOfferingId =
-    actualOfferingId ?? latestSnapshot?.offeringId ?? null;
+    actualOfferingId ?? predictionSnapshot?.offeringId ?? null;
   const resolvedPrimaryContactId =
     primaryContactId ?? current?.primaryContactId ?? null;
 
@@ -234,6 +241,8 @@ export async function POST(
         owner_user_id,
         primary_contact_id,
         current_offering_id,
+        origin_opportunity_snapshot_id,
+        origin_prediction_captured_at,
         next_action,
         next_action_at,
         notes,
@@ -256,6 +265,8 @@ export async function POST(
         ${ownerUserId},
         ${primaryContactId},
         ${currentOfferingId},
+        ${current?.originOpportunitySnapshotId ?? predictionSnapshot?.id ?? null},
+        ${current?.originOpportunitySnapshotId ? null : new Date()},
         ${nextAction},
         ${nextActionAt},
         ${notes},
@@ -277,6 +288,14 @@ export async function POST(
         owner_user_id = EXCLUDED.owner_user_id,
         primary_contact_id = EXCLUDED.primary_contact_id,
         current_offering_id = EXCLUDED.current_offering_id,
+        origin_opportunity_snapshot_id = COALESCE(
+          company_sales_lifecycle.origin_opportunity_snapshot_id,
+          EXCLUDED.origin_opportunity_snapshot_id
+        ),
+        origin_prediction_captured_at = COALESCE(
+          company_sales_lifecycle.origin_prediction_captured_at,
+          EXCLUDED.origin_prediction_captured_at
+        ),
         next_action = EXCLUDED.next_action,
         next_action_at = EXCLUDED.next_action_at,
         notes = EXCLUDED.notes,
@@ -381,11 +400,11 @@ export async function POST(
           ${user.organizationId},
           ${companyId},
           ${stage},
-          ${latestSnapshot?.id ?? null},
-          ${latestSnapshot?.opportunityScore ?? null},
-          ${latestSnapshot?.conversionProbability ?? null},
-          ${latestSnapshot?.dealValueExpected ?? null},
-          ${latestSnapshot?.expectedRevenue ?? null},
+          ${predictionSnapshot?.id ?? null},
+          ${predictionSnapshot?.opportunityScore ?? null},
+          ${predictionSnapshot?.conversionProbability ?? null},
+          ${predictionSnapshot?.dealValueExpected ?? null},
+          ${predictionSnapshot?.expectedRevenue ?? null},
           ${stage === "WON" ? actualContractValue : null},
           ${resolvedActualOfferingId},
           ${resolvedPrimaryContactId},
@@ -394,7 +413,7 @@ export async function POST(
           ${
             "Company source: " +
             company.sourceOrigin +
-            (latestSnapshot
+            (predictionSnapshot
               ? "; M3 model: " + latestSnapshot.modelVersion
               : "; no M3 snapshot available")
           },
