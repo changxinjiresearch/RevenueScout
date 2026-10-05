@@ -419,6 +419,68 @@ export function findBestIcp(
   )[0] ?? null;
 }
 
+function offeringFitScore(
+  company: CandidateCompanyFacts,
+  offering: OfferingConfig,
+): number {
+  const offeringText = normalise(
+    [
+      offering.name,
+      offering.description ?? "",
+      offering.primaryProblems ?? "",
+      offering.typicalCustomers ?? "",
+    ].join(" "),
+  );
+
+  const companyTerms = [
+    company.industry,
+    company.subindustry,
+    ...company.businessModels,
+    ...company.technologies,
+  ]
+    .filter((value): value is string => Boolean(value?.trim()))
+    .flatMap((value) => normalise(value).split(/\s+/))
+    .filter((value) => value.length >= 4);
+
+  let score = companyTerms.reduce(
+    (sum, term) => sum + (offeringText.includes(term) ? 3 : 0),
+    0,
+  );
+
+  if (
+    company.digitalNeed &&
+    /(automation|workflow|digital|software|system|integration|process)/.test(
+      offeringText,
+    )
+  ) {
+    score += 16;
+  }
+  if (
+    company.multiLocation &&
+    /(operations|workflow|coordination|integration|scheduling|automation)/.test(
+      offeringText,
+    )
+  ) {
+    score += 10;
+  }
+  if (
+    company.fastGrowth &&
+    /(growth|scale|scaling|automation|operations|workflow)/.test(offeringText)
+  ) {
+    score += 8;
+  }
+  if (
+    company.hiring &&
+    /(onboarding|workflow|operations|automation|workforce|process)/.test(
+      offeringText,
+    )
+  ) {
+    score += 5;
+  }
+
+  return score;
+}
+
 function chooseDealValue(
   company: CandidateCompanyFacts,
   offering: OfferingConfig,
@@ -480,8 +542,13 @@ export function configureOpportunity(
     .map((offering) => ({
       offering,
       deal: chooseDealValue(company, offering),
+      fitScore: offeringFitScore(company, offering),
     }))
-    .sort((a, b) => b.deal.value - a.deal.value);
+    .sort(
+      (a, b) =>
+        b.fitScore - a.fitScore ||
+        b.deal.value - a.deal.value,
+    );
 
   const selected = ranked[0] ?? null;
   const reasonParts = matchedIcp.reasons.slice(0, 3);
@@ -519,7 +586,9 @@ export function configureOpportunity(
     offeringReason:
       linkedOfferings.length === 1
         ? `${selected.offering.name} is explicitly linked to ${matchedIcp.icpName}.`
-        : `${selected.offering.name} has the strongest configured deal-value basis among Offerings linked to ${matchedIcp.icpName}.`,
+        : selected.fitScore > 0
+          ? `${selected.offering.name} has the strongest problem/need fit among Offerings linked to ${matchedIcp.icpName}; deal economics break ties.`
+          : `${selected.offering.name} has the strongest configured deal-value basis among Offerings linked to ${matchedIcp.icpName}.`,
     dealValueBasis: selected.deal.basis,
     opportunity: {
       ...base,
