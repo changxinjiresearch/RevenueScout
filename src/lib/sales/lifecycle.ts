@@ -123,10 +123,10 @@ export function isClosedStage(stage: LifecycleStage): boolean {
 export function canRecordOutboundContact(
   status: ContactabilityStatus,
 ): boolean {
-  return !(
-    status === "DO_NOT_CONTACT" ||
-    status === "UNSUBSCRIBED" ||
-    status === "UNCERTAIN"
+  return (
+    status === "CONTACT_PERMITTED" ||
+    status === "EXISTING_RELATIONSHIP" ||
+    status === "USER_CONFIRMED_CONSENT"
   );
 }
 
