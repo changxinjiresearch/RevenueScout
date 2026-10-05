@@ -55,6 +55,7 @@ function stableInputHash(input: {
   offerings: OfferingConfig[];
   links: OfferingIcpLink[];
   m2SalesPriorityScore?: number | null;
+  asOfDay: string;
 }): string {
   const payload = {
     configVersion: input.configVersion,
@@ -93,6 +94,7 @@ function stableInputHash(input: {
       ),
     ),
     m2SalesPriorityScore: input.m2SalesPriorityScore ?? null,
+    asOfDay: input.asOfDay,
   };
 
   return createHash("sha256")
@@ -111,7 +113,9 @@ export async function createOrGetOpportunitySnapshot(input: {
   offerings: OfferingConfig[];
   links: OfferingIcpLink[];
   m2SalesPriorityScore?: number | null;
+  now?: Date;
 }): Promise<PersistedOpportunitySnapshot | null> {
+  const now = input.now ?? new Date();
   const configured = buildConfiguredOpportunityFromCompany({
     company: input.company,
     evidence: input.evidence,
@@ -119,6 +123,7 @@ export async function createOrGetOpportunitySnapshot(input: {
     icps: input.icps,
     offerings: input.offerings,
     links: input.links,
+    now,
   });
 
   if (!configured) return null;
@@ -130,6 +135,7 @@ export async function createOrGetOpportunitySnapshot(input: {
     offerings: input.offerings,
     signals: input.signals,
     m2SalesPriorityScore: input.m2SalesPriorityScore,
+    now,
   });
 
   const inputHash = stableInputHash({
@@ -140,6 +146,7 @@ export async function createOrGetOpportunitySnapshot(input: {
     offerings: input.offerings,
     links: input.links,
     m2SalesPriorityScore: input.m2SalesPriorityScore,
+    asOfDay: now.toISOString().slice(0, 10),
   });
 
   const sql = db();
