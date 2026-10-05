@@ -17,6 +17,12 @@ import { assessOpportunity } from "@/lib/domain/opportunity-score";
 import type { OpportunityInput } from "@/lib/domain/types";
 import { db } from "@/lib/db";
 import { getOnboardingState } from "@/lib/onboarding";
+import {
+  applyOpportunityOverride,
+  createOrGetOpportunitySnapshot,
+  type EffectiveOpportunity,
+  type OpportunityOverride,
+} from "@/lib/opportunities/service";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +36,7 @@ type PriorityRun = {
   researchPriorityScore: number | null;
   valueOfInformationScore: number | null;
   priorityAction: string | null;
+  m3: EffectiveOpportunity | null;
 };
 
 type TodayItem = OpportunityInput & {
@@ -80,8 +87,16 @@ export default async function Home() {
     }
 
     const sql = db();
-    const [icps, offerings, links, companies, evidence, signals, priorityRuns] =
-      await Promise.all([
+    const [
+      icps,
+      offerings,
+      links,
+      companies,
+      evidence,
+      signals,
+      priorityRuns,
+      opportunityOverrides,
+    ] = await Promise.all([
         sql<IcpRule[]>`
           SELECT
             id,
@@ -121,9 +136,13 @@ export default async function Home() {
           SELECT
             id,
             name,
+            description,
+            primary_problems AS "primaryProblems",
+            typical_customers AS "typicalCustomers",
             min_contract_value::float8 AS "minContractValue",
             avg_contract_value::float8 AS "avgContractValue",
-            ideal_contract_value::float8 AS "idealContractValue"
+            ideal_contract_value::float8 AS "idealContractValue",
+            sales_cycle_days AS "salesCycleDays"
           FROM offerings
           WHERE organization_id = ${user.organizationId}
         `,
@@ -213,6 +232,19 @@ export default async function Home() {
             AND engine = 'REVENUESCOUT_INTELLIGENCE_V2'
           ORDER BY company_id, created_at DESC
         `,
+        sql<OpportunityOverride[]>`
+          SELECT
+            company_id AS "companyId",
+            priority_override AS "priorityOverride",
+            conversion_probability_override::float8 AS "conversionProbabilityOverride",
+            expected_deal_value_override::float8 AS "expectedDealValueOverride",
+            offering_id_override AS "offeringIdOverride",
+            next_best_action_override AS "nextBestActionOverride",
+            note,
+            updated_at AS "updatedAt"
+          FROM opportunity_overrides
+          WHERE organization_id = ${user.organizationId}
+        `,
       ]);
 
     storedCompanyCount = companies.length;
@@ -220,6 +252,9 @@ export default async function Home() {
     const salesCompanyIds = new Set<string>();
     const runByCompany = new Map(
       priorityRuns.map((run) => [run.companyId, run]),
+    );
+    const overrideByCompany = new Map(
+      opportunityOverrides.map((override) => [override.companyId, override]),
     );
 
     for (const company of companies) {
@@ -243,6 +278,26 @@ export default async function Home() {
       if (configured) {
         salesCompanyIds.add(company.id);
         const opportunity = configured.opportunity;
+        const snapshot = await createOrGetOpportunitySnapshot({
+          organizationId: user.organizationId,
+          userId: user.id,
+          configVersion: user.configVersion,
+          company,
+          evidence: companyEvidence,
+          signals: companySignals,
+          icps,
+          offerings,
+          links,
+          m2SalesPriorityScore: priorityRun?.salesPriorityScore ?? null,
+        });
+        const m3 = snapshot
+          ? applyOpportunityOverride({
+              snapshot,
+              override: overrideByCompany.get(company.id) ?? null,
+              offerings,
+            })
+          : null;
+
         configuredItems.push({
           ...opportunity,
           assessment: assessOpportunity(opportunity),
@@ -255,6 +310,7 @@ export default async function Home() {
           potentialScore: priorityRun?.potentialScore ?? null,
           confidenceScore: priorityRun?.confidenceScore ?? null,
           priorityAction: priorityRun?.priorityAction ?? null,
+          m3,
         });
       }
     }
@@ -314,18 +370,30 @@ export default async function Home() {
       potentialScore: null,
       confidenceScore: null,
       priorityAction: null,
+      m3: null,
     }));
+  }
+
+  function overrideOrder(item: TodayItem): number {
+    const priority = item.m3?.override?.priorityOverride ?? "AUTO";
+    if (priority === "HIGH") return 5;
+    if (priority === "AUTO") return 4;
+    if (priority === "MEDIUM") return 3;
+    if (priority === "LOW") return 2;
+    return 1;
   }
 
   items.sort(
     (a, b) =>
+      overrideOrder(b) - overrideOrder(a) ||
+      (b.m3?.effectiveRankScore ?? -1) - (a.m3?.effectiveRankScore ?? -1) ||
       (b.salesPriorityScore ?? -1) - (a.salesPriorityScore ?? -1) ||
-      b.assessment.expectedRevenue - a.assessment.expectedRevenue ||
       b.assessment.opportunityScore - a.assessment.opportunityScore,
   );
 
   const expectedRevenue = items.reduce(
-    (sum, item) => sum + item.assessment.expectedRevenue,
+    (sum, item) =>
+      sum + (item.m3?.effectiveExpectedRevenue ?? item.assessment.expectedRevenue),
     0,
   );
 
