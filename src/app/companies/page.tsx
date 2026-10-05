@@ -141,6 +141,10 @@ export default async function CompaniesPage({
         l.notes,
         opp.matched_icp_name,
         opp.offering_name,
+        opp.why_this_company,
+        opp.why_now,
+        opp.problem_hypothesis,
+        opp.next_best_action,
         ct."contactText",
         act."activityText"
       )) AS "searchText",
@@ -175,7 +179,11 @@ export default async function CompaniesPage({
         os.conversion_probability,
         os.deal_value_expected,
         os.matched_icp_name,
-        os.offering_name
+        os.offering_name,
+        os.why_this_company,
+        os.why_now,
+        os.problem_hypothesis,
+        os.next_best_action
       FROM opportunity_snapshots os
       WHERE os.organization_id = c.organization_id
         AND os.company_id = c.id
