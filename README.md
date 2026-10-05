@@ -12,6 +12,7 @@ The frozen product specification and approved discovery amendment are stored at:
 - `docs/PRODUCT_SPEC_v1.1_DISCOVERY_AMENDMENT.md`
 - `docs/PRODUCT_SPEC_v1.2_PROGRESSIVE_DISCOVERY.md`
 - `docs/PRODUCT_SPEC_v1.3_DISCOVERY_VALIDATION_RECOVERY.md`
+- `docs/PRODUCT_SPEC_v1.4_ICP_GEOGRAPHY_AND_CORROBORATION.md`
 
 All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
@@ -31,6 +32,8 @@ The current application includes:
 - multi-source validation with Supported / Corroborated / Confirmed industry-evidence tiers
 - identity evidence (for example GLEIF) kept separate from direct industry-classification evidence
 - relative High / Medium / Research discovery priority with unknown fields kept non-negative
+- canonical ICP geography matching (for example Australia ↔ AU, VIC ↔ AU-VIC)
+- exact-company structured-source corroboration where independent evidence exists
 - GLEIF and Wikidata discovery inputs plus verified official-company-site evidence
 - RevenueScout Intelligence Engine v2
 - Claim cross-validation and source-independence analysis
