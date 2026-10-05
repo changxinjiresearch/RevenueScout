@@ -5,6 +5,8 @@ import { jsonArrayValue } from "@/lib/db/json-value";
 import { listDiscoveryProviders } from "@/lib/discovery/providers";
 import type { DiscoveryCandidate } from "@/lib/discovery/types";
 import { assessDiscoveryCandidate } from "@/lib/companies/triage";
+import type { ProgressiveDiscoveryProgress } from "@/lib/discovery/progressive";
+import { DiscoveryProgress } from "./DiscoveryProgress";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +27,33 @@ function triageLabel(status: string): string {
   return "Needs enrichment";
 }
 
+function candidatePriorityLabel(candidate: DiscoveryCandidate): string {
+  const priority = candidate.discoveryPriority;
+  if (!priority) return triageLabel(assessDiscoveryCandidate(candidate).status);
+  if (priority.qualificationStatus === "NOT_QUALIFIED") return "Not qualified";
+  if (priority.band === "HIGH") return "High priority";
+  if (priority.band === "MEDIUM") return "Medium priority";
+  return "Research priority";
+}
+
+function candidatePriorityHeadline(candidate: DiscoveryCandidate): string {
+  const priority = candidate.discoveryPriority;
+  if (!priority) return assessDiscoveryCandidate(candidate).headline;
+  if (priority.qualificationStatus === "QUALIFIED") {
+    return "ICP qualified with independently validated industry evidence";
+  }
+  if (priority.qualificationStatus === "PARTIALLY_QUALIFIED") {
+    return "Strong partial ICP match; missing fields remain unknown";
+  }
+  return "Known ICP mismatch; keep only for research if useful";
+}
+
+function totalSourceFamilies(candidate: DiscoveryCandidate): number {
+  return new Set(
+    (candidate.sourceEvidence ?? []).map((item) => item.sourceFamily),
+  ).size;
+}
+
 type Named = { id: string; name: string };
 
 type DiscoveryRun = {
@@ -38,6 +67,7 @@ type DiscoveryRun = {
   importedCount: number;
   results: DiscoveryCandidate[];
   errorMessage: string | null;
+  progress: ProgressiveDiscoveryProgress | null;
   createdAt: Date;
 };
 
@@ -82,6 +112,7 @@ export default async function DiscoverPage({
         imported_count AS "importedCount",
         results,
         error_message AS "errorMessage",
+        progress,
         created_at AS "createdAt"
       FROM discovery_runs
       WHERE id = ${params.run}
@@ -208,16 +239,44 @@ export default async function DiscoverPage({
             </p>
           </div>
 
+          {run.status === "RUNNING" ? (
+            <DiscoveryProgress
+              runId={run.id}
+              initialStatus={run.status}
+              initialProgress={run.progress}
+            />
+          ) : null}
+
+          {run.status === "FAILED" ? (
+            <div className="error-banner">
+              Discovery failed: {run.errorMessage ?? "Unknown discovery error."}
+            </div>
+          ) : null}
+
           {run.results.length === 0 ? (
             <div className="empty-state">
-              <h3>No entities returned.</h3>
-              <p>Try a broader legal-name keyword or remove the country filter.</p>
+              <h3>
+                {run.status === "RUNNING"
+                  ? "Searching and validating companies…"
+                  : "No companies passed multi-source validation."}
+              </h3>
+              <p>
+                {run.status === "RUNNING"
+                  ? "Validated companies will appear here progressively; you do not need to wait for the entire market search to finish."
+                  : "Try a broader market concept or a different geography."}
+              </p>
             </div>
           ) : (
             <div className="discovery-results">
               {run.results.map((candidate, index) => {
                 const precheck = assessDiscoveryCandidate(candidate);
-                const lowPotential = precheck.status === "LOW_POTENTIAL";
+                const priority = candidate.discoveryPriority;
+                const lowPotential =
+                  priority?.qualificationStatus === "NOT_QUALIFIED" ||
+                  precheck.status === "LOW_POTENTIAL";
+                const sourceFamilies = totalSourceFamilies(candidate);
+                const industrySources =
+                  candidate.industryValidation?.independentSupportingFamilyCount ?? 0;
 
                 return (
                   <article
@@ -228,7 +287,7 @@ export default async function DiscoverPage({
                       <div>
                         <span className="source-badge">
                           {candidate.industryValidation
-                            ? `${candidate.industryValidation.independentSupportingFamilyCount} sources`
+                            ? `${sourceFamilies} sources · ${industrySources} industry`
                             : candidate.provider}
                         </span>
                         <h3>{candidate.displayName}</h3>
@@ -242,16 +301,27 @@ export default async function DiscoverPage({
                         className={
                           lowPotential
                             ? "triage-pill triage-low"
-                            : "triage-pill triage-review"
+                            : priority?.band === "HIGH"
+                              ? "triage-pill"
+                              : "triage-pill triage-review"
                         }
                       >
-                        {triageLabel(precheck.status)}
+                        {candidatePriorityLabel(candidate)}
                       </span>
                     </div>
 
                     <div className="discovery-precheck">
-                      <strong>{precheck.headline}</strong>
-                      <p>{precheck.reasons[0]}</p>
+                      <strong>{candidatePriorityHeadline(candidate)}</strong>
+                      <p>
+                        {priority?.rationale[priority.rationale.length - 1] ??
+                          precheck.reasons[0]}
+                      </p>
+                      {priority?.missingFields.length ? (
+                        <p>
+                          Still unknown: {priority.missingFields.join(", ")}.
+                          Unknown fields are not scored as negative.
+                        </p>
+                      ) : null}
                       {candidate.industryValidation ? (
                         <p>
                           Industry {candidate.industryValidation.status.toLowerCase()} ·{" "}
@@ -279,7 +349,7 @@ export default async function DiscoverPage({
                       </span>
                       <span>
                         <small>Employees</small>
-                        <strong>{candidate.employeeCount ?? "Needs enrichment"}</strong>
+                        <strong>{candidate.employeeCount ?? "Unknown"}</strong>
                       </span>
                     </div>
 
