@@ -133,7 +133,9 @@ export default async function DiscoverPage({
         <div className="nav-links">
           <Link href="/">Today</Link>
           <Link className="nav-active" href="/discover">Discover</Link>
-          <Link href="/companies">Companies</Link>
+          <Link href="/companies">Search</Link>
+          <Link href="/watchlist">Watchlist</Link>
+          <Link href="/compliance">Compliance</Link>
           <Link href="/setup">Market Setup</Link>
           <Link href="/workspace">Workspace</Link>
         </div>
