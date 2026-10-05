@@ -86,6 +86,30 @@ export function relationshipStatusForStage(
   return "NONE";
 }
 
+const STAGE_PROGRESS: Partial<Record<LifecycleStage, number>> = {
+  DISCOVERED: 0,
+  QUALIFIED: 1,
+  READY_TO_CONTACT: 2,
+  CONTACTED: 3,
+  REPLIED: 4,
+  MEETING: 5,
+  OPPORTUNITY: 6,
+  PROPOSAL: 7,
+  WON: 8,
+  LOST: 8,
+};
+
+export function shouldAdvanceLifecycle(
+  current: LifecycleStage,
+  suggested: LifecycleStage,
+): boolean {
+  const currentRank = STAGE_PROGRESS[current];
+  const suggestedRank = STAGE_PROGRESS[suggested];
+  if (currentRank === undefined || suggestedRank === undefined) return false;
+  if (current === "WON" || current === "LOST") return false;
+  return suggestedRank > currentRank;
+}
+
 export function isClosedStage(stage: LifecycleStage): boolean {
   return (
     stage === "WON" ||
