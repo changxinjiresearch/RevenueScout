@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { addAustralianIndustryDirectoryEvidence } from "../src/lib/discovery/industry-directories";
+import {
+  addAustralianIndustryDirectoryEvidence,
+  resetIndustryDirectoryPageCacheForTests,
+} from "../src/lib/discovery/industry-directories";
 import { industryValidationForCandidate } from "../src/lib/discovery/multi-source";
 import type { DiscoveryCandidate } from "../src/lib/discovery/types";
 
@@ -79,6 +82,7 @@ function candidate(): DiscoveryCandidate {
 }
 
 afterEach(() => {
+  resetIndustryDirectoryPageCacheForTests();
   vi.unstubAllGlobals();
 });
 
