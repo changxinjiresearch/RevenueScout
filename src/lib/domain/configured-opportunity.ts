@@ -1,5 +1,5 @@
-import type { OpportunityInput } from "@/lib/domain/types";
-import { geographyMatches } from "@/lib/discovery/geography";
+import type { OpportunityInput } from "./types";
+import { geographyMatches } from "../discovery/geography";
 
 export interface CandidateCompanyFacts {
   country: string | null;
