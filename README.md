@@ -10,6 +10,7 @@ The frozen product specification and approved discovery amendment are stored at:
 
 - `docs/PRODUCT_SPEC_v1.0.md`
 - `docs/PRODUCT_SPEC_v1.1_DISCOVERY_AMENDMENT.md`
+- `docs/PRODUCT_SPEC_v1.2_PROGRESSIVE_DISCOVERY.md`
 
 All implementation decisions must remain traceable to those documents unless a later version explicitly supersedes them.
 
@@ -22,10 +23,13 @@ The current application includes:
 - account, workspace, role and permission management
 - Offering and ICP configuration with executable qualification rules
 - persistent companies, evidence and buying signals
-- multi-source semantic company discovery
+- progressive multi-source semantic company discovery
 - no fixed product-level discovery result cap
+- bounded/resumable discovery steps with results appearing progressively
 - pre-render company deduplication across provider identifiers, domains and normalized company identities
-- industry validation requiring at least two independent supporting source families
+- industry validation requiring at least two true independent industry-supporting source families
+- identity evidence (for example GLEIF) kept separate from industry-classification evidence
+- relative High / Medium / Research discovery priority with unknown fields kept non-negative
 - GLEIF and Wikidata discovery inputs plus verified official-company-site evidence
 - RevenueScout Intelligence Engine v2
 - Claim cross-validation and source-independence analysis
