@@ -1365,6 +1365,690 @@ export default async function CompanyIntelligencePage({
         </section>
       )}
 
+      <section className="m4-sales-card">
+        <div className="m4-sales-heading">
+          <div>
+            <div className="eyebrow">M4 · Contacts & Sales Lifecycle</div>
+            <h2>Real sales execution</h2>
+            <p>
+              Follow the M3 recommendation through a named contact, real sales
+              activity and a Won/Lost outcome. These records become ground truth
+              for future probability calibration.
+            </p>
+          </div>
+          <span className="m4-stage-pill">{lifecycleLabel(lifecycle.stage)}</span>
+        </div>
+
+        <div className="m4-summary-grid">
+          <div>
+            <span>Opportunity owner</span>
+            <strong>{lifecycle.ownerName ?? "Unassigned"}</strong>
+          </div>
+          <div>
+            <span>Recommended contact</span>
+            <strong>
+              {recommendedContactRecord?.name ??
+                recommendedContact.roleTarget}
+            </strong>
+          </div>
+          <div>
+            <span>Last contact</span>
+            <strong>
+              {lifecycle.lastContactAt
+                ? new Date(lifecycle.lastContactAt).toLocaleDateString("en-AU")
+                : "No contact yet"}
+            </strong>
+          </div>
+          <div>
+            <span>Next action</span>
+            <strong>
+              {lifecycle.nextAction ||
+                effectiveOpportunity?.effectiveNextBestAction ||
+                "Not scheduled"}
+            </strong>
+          </div>
+        </div>
+
+        <div className="m4-recommended-contact">
+          <div>
+            <span className="field-label">Why this person?</span>
+            <strong>
+              {recommendedContactRecord
+                ? `${recommendedContactRecord.name} · ${recommendedContactRecord.position || "Position unknown"}`
+                : `Find: ${recommendedContact.roleTarget}`}
+            </strong>
+            <p>{recommendedContact.reason}</p>
+          </div>
+          {recommendedContactRecord ? (
+            <div className="m4-contactability">
+              <span>
+                {contactabilityLabel(
+                  recommendedContactRecord.contactabilityStatus,
+                )}
+              </span>
+              <small>
+                {decisionRelevanceLabel(
+                  recommendedContactRecord.decisionRelevance,
+                )}{" "}
+                · {Math.round(recommendedContactRecord.confidence * 100)}%
+                confidence
+              </small>
+            </div>
+          ) : null}
+        </div>
+
+        <details className="m4-panel" open>
+          <summary>Lifecycle, owner and outcome</summary>
+          <form
+            className="m4-form"
+            action={`/api/companies/${id}/lifecycle`}
+            method="post"
+          >
+            <label>
+              Lifecycle stage
+              <select name="stage" defaultValue={lifecycle.stage}>
+                {lifecycleStages.map((stage) => (
+                  <option key={stage} value={stage}>
+                    {lifecycleLabel(stage)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Owner
+              <select
+                name="ownerUserId"
+                defaultValue={lifecycle.ownerUserId ?? ""}
+              >
+                <option value="">Unassigned</option>
+                {workspaceMembers.map((member) => (
+                  <option key={member.userId} value={member.userId}>
+                    {member.name} · {member.role}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Primary contact
+              <select
+                name="primaryContactId"
+                defaultValue={lifecycle.primaryContactId ?? ""}
+              >
+                <option value="">No primary contact</option>
+                {contacts.map((contact) => (
+                  <option key={contact.id} value={contact.id}>
+                    {contact.name}
+                    {contact.position ? ` · ${contact.position}` : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Current Offering
+              <select
+                name="currentOfferingId"
+                defaultValue={
+                  lifecycle.currentOfferingId ??
+                  effectiveOpportunity?.effectiveOfferingId ??
+                  ""
+                }
+              >
+                <option value="">No Offering selected</option>
+                {offerings.map((offering) => (
+                  <option key={offering.id} value={offering.id}>
+                    {offering.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="span-2">
+              Next action
+              <input
+                name="nextAction"
+                defaultValue={
+                  lifecycle.nextAction ||
+                  effectiveOpportunity?.effectiveNextBestAction ||
+                  ""
+                }
+                placeholder="e.g. Research operations director before outreach"
+              />
+            </label>
+            <label>
+              Next action date
+              <input
+                name="nextActionAt"
+                type="datetime-local"
+                defaultValue={datetimeLocalValue(lifecycle.nextActionAt)}
+              />
+            </label>
+            <label>
+              Actual Offering if Won/Lost
+              <select name="actualOfferingId" defaultValue="">
+                <option value="">Use current/model Offering</option>
+                {offerings.map((offering) => (
+                  <option key={offering.id} value={offering.id}>
+                    {offering.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Actual contract value · required for Won
+              <input
+                name="actualContractValue"
+                type="number"
+                min="0"
+                step="1"
+                placeholder="e.g. 28500"
+              />
+            </label>
+            <label>
+              Lost reason · required for Lost
+              <select name="lostReason" defaultValue="">
+                <option value="">Select only when Lost</option>
+                <option value="NO_BUDGET">No budget</option>
+                <option value="NO_NEED">No need</option>
+                <option value="TIMING">Timing</option>
+                <option value="COMPETITOR">Competitor</option>
+                <option value="PRICE">Price</option>
+                <option value="WRONG_CONTACT">Wrong contact</option>
+                <option value="COMPANY_TOO_SMALL">Company too small</option>
+                <option value="EXISTING_SUPPLIER">Existing supplier</option>
+                <option value="NO_RESPONSE">No response</option>
+                <option value="INTERNAL_SOLUTION">Internal solution</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </label>
+            <label className="span-2">
+              Lost reason note
+              <input
+                name="lostReasonNote"
+                placeholder="Optional context for future learning"
+              />
+            </label>
+            <label className="span-2">
+              Shared sales notes
+              <textarea
+                name="notes"
+                defaultValue={lifecycle.notes}
+                placeholder="Context the team should know"
+              />
+            </label>
+            <div className="span-2 form-actions">
+              <button className="primary-button" type="submit">
+                Save lifecycle
+              </button>
+            </div>
+          </form>
+        </details>
+
+        <details className="m4-panel" open={contacts.length === 0}>
+          <summary>Contacts ({contacts.length})</summary>
+          {contacts.length > 0 ? (
+            <div className="m4-contact-list">
+              {contacts.map((contact) => (
+                <article
+                  className={
+                    contact.id === recommendedContact.contactId
+                      ? "m4-contact-card m4-contact-recommended"
+                      : "m4-contact-card"
+                  }
+                  key={contact.id}
+                >
+                  <div className="m4-contact-card-head">
+                    <div>
+                      <strong>{contact.name}</strong>
+                      <span>{contact.position || "Position unknown"}</span>
+                    </div>
+                    <span>
+                      {contact.id === recommendedContact.contactId
+                        ? "Recommended"
+                        : decisionRelevanceLabel(contact.decisionRelevance)}
+                    </span>
+                  </div>
+                  <div className="m4-contact-meta">
+                    <span>{contact.email ?? "No email"}</span>
+                    <span>{contact.phone ?? "No phone"}</span>
+                    <span>
+                      {contactabilityLabel(contact.contactabilityStatus)}
+                    </span>
+                    <span>
+                      {contact.verificationStatus.toLowerCase()} ·{" "}
+                      {Math.round(contact.confidence * 100)}%
+                    </span>
+                  </div>
+                  {contact.linkedinUrl ? (
+                    <a href={contact.linkedinUrl} target="_blank" rel="noreferrer">
+                      LinkedIn
+                    </a>
+                  ) : null}
+                  {contact.sourceUrl ? (
+                    <a href={contact.sourceUrl} target="_blank" rel="noreferrer">
+                      Contact source
+                    </a>
+                  ) : null}
+
+                  <details className="m4-contact-edit">
+                    <summary>Edit contact</summary>
+                    <form
+                      className="m4-form compact"
+                      action={`/api/companies/${id}/contacts`}
+                      method="post"
+                    >
+                      <input type="hidden" name="contactId" value={contact.id} />
+                      <label>
+                        Name
+                        <input name="name" defaultValue={contact.name} required />
+                      </label>
+                      <label>
+                        Position
+                        <input name="position" defaultValue={contact.position} />
+                      </label>
+                      <label>
+                        Email
+                        <input name="email" type="email" defaultValue={contact.email ?? ""} />
+                      </label>
+                      <label>
+                        Phone
+                        <input name="phone" defaultValue={contact.phone ?? ""} />
+                      </label>
+                      <label>
+                        LinkedIn
+                        <input name="linkedinUrl" defaultValue={contact.linkedinUrl ?? ""} />
+                      </label>
+                      <label>
+                        Location
+                        <input name="location" defaultValue={contact.location ?? ""} />
+                      </label>
+                      <label>
+                        Decision relevance
+                        <select
+                          name="decisionRelevance"
+                          defaultValue={contact.decisionRelevance}
+                        >
+                          <option value="PRIMARY_DECISION_MAKER">Primary decision maker</option>
+                          <option value="DECISION_MAKER">Decision maker</option>
+                          <option value="INFLUENCER">Influencer</option>
+                          <option value="CHAMPION">Champion</option>
+                          <option value="PROCUREMENT">Procurement</option>
+                          <option value="TECHNICAL">Technical</option>
+                          <option value="GATEKEEPER">Gatekeeper</option>
+                          <option value="UNKNOWN">Unknown</option>
+                        </select>
+                      </label>
+                      <label>
+                        Contactability
+                        <select
+                          name="contactabilityStatus"
+                          defaultValue={contact.contactabilityStatus}
+                        >
+                          <option value="CONTACT_PERMITTED">Contact permitted</option>
+                          <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
+                          <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
+                          <option value="PUBLIC_BUSINESS_CONTACT">Public business contact</option>
+                          <option value="UNCERTAIN">Uncertain</option>
+                          <option value="DO_NOT_CONTACT">Do not contact</option>
+                          <option value="UNSUBSCRIBED">Unsubscribed</option>
+                        </select>
+                      </label>
+                      <label>
+                        Contact status
+                        <select name="contactStatus" defaultValue={contact.contactStatus}>
+                          <option value="ACTIVE">Active</option>
+                          <option value="UNKNOWN">Unknown</option>
+                          <option value="INVALID">Invalid</option>
+                          <option value="LEFT_COMPANY">Left company</option>
+                        </select>
+                      </label>
+                      <label>
+                        Verification
+                        <select
+                          name="verificationStatus"
+                          defaultValue={contact.verificationStatus}
+                        >
+                          <option value="CONFIRMED">Confirmed</option>
+                          <option value="LIKELY">Likely</option>
+                          <option value="UNVERIFIED">Unverified</option>
+                          <option value="OUTDATED">Outdated</option>
+                        </select>
+                      </label>
+                      <label>
+                        Confidence %
+                        <input
+                          name="confidence"
+                          type="number"
+                          min="0"
+                          max="100"
+                          defaultValue={Math.round(contact.confidence * 100)}
+                        />
+                      </label>
+                      <label>
+                        Source label
+                        <input name="sourceLabel" defaultValue={contact.sourceLabel} />
+                      </label>
+                      <label className="span-2">
+                        Source URL
+                        <input name="sourceUrl" defaultValue={contact.sourceUrl ?? ""} />
+                      </label>
+                      <label className="span-2">
+                        Notes
+                        <textarea name="notes" defaultValue={contact.notes} />
+                      </label>
+                      <button className="secondary-button" type="submit">
+                        Update contact
+                      </button>
+                    </form>
+                  </details>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="muted-copy">
+              No named contacts are stored yet. RevenueScout recommends finding{" "}
+              <strong>{recommendedContact.roleTarget}</strong>.
+            </p>
+          )}
+
+          <div className="m4-new-contact">
+            <h3>Add contact</h3>
+            <form
+              className="m4-form"
+              action={`/api/companies/${id}/contacts`}
+              method="post"
+            >
+              <label>
+                Name
+                <input name="name" required />
+              </label>
+              <label>
+                Position
+                <input name="position" placeholder="e.g. Head of Operations" />
+              </label>
+              <label>
+                Email
+                <input name="email" type="email" />
+              </label>
+              <label>
+                Phone
+                <input name="phone" />
+              </label>
+              <label>
+                LinkedIn
+                <input name="linkedinUrl" type="url" />
+              </label>
+              <label>
+                Location
+                <input name="location" />
+              </label>
+              <label>
+                Decision relevance
+                <select name="decisionRelevance" defaultValue="UNKNOWN">
+                  <option value="PRIMARY_DECISION_MAKER">Primary decision maker</option>
+                  <option value="DECISION_MAKER">Decision maker</option>
+                  <option value="INFLUENCER">Influencer</option>
+                  <option value="CHAMPION">Champion</option>
+                  <option value="PROCUREMENT">Procurement</option>
+                  <option value="TECHNICAL">Technical</option>
+                  <option value="GATEKEEPER">Gatekeeper</option>
+                  <option value="UNKNOWN">Unknown</option>
+                </select>
+              </label>
+              <label>
+                Contactability / compliance
+                <select name="contactabilityStatus" defaultValue="UNCERTAIN">
+                  <option value="UNCERTAIN">Uncertain</option>
+                  <option value="CONTACT_PERMITTED">Contact permitted</option>
+                  <option value="PUBLIC_BUSINESS_CONTACT">Public business contact</option>
+                  <option value="EXISTING_RELATIONSHIP">Existing relationship</option>
+                  <option value="USER_CONFIRMED_CONSENT">User-confirmed consent</option>
+                  <option value="DO_NOT_CONTACT">Do not contact</option>
+                  <option value="UNSUBSCRIBED">Unsubscribed</option>
+                </select>
+              </label>
+              <input type="hidden" name="contactStatus" value="ACTIVE" />
+              <label>
+                Verification
+                <select name="verificationStatus" defaultValue="UNVERIFIED">
+                  <option value="CONFIRMED">Confirmed</option>
+                  <option value="LIKELY">Likely</option>
+                  <option value="UNVERIFIED">Unverified</option>
+                </select>
+              </label>
+              <label>
+                Confidence %
+                <input name="confidence" type="number" min="0" max="100" defaultValue="50" />
+              </label>
+              <label>
+                Source label
+                <input name="sourceLabel" defaultValue="Manual" />
+              </label>
+              <label>
+                Source URL
+                <input name="sourceUrl" type="url" />
+              </label>
+              <label className="span-2">
+                Notes
+                <textarea name="notes" />
+              </label>
+              <button className="primary-button" type="submit">
+                Add contact
+              </button>
+            </form>
+          </div>
+        </details>
+
+        <details className="m4-panel" open={salesActivities.length === 0}>
+          <summary>Sales activity ({salesActivities.length})</summary>
+          <div className="m4-activity-form-wrap">
+            <form
+              className="m4-form"
+              action={`/api/companies/${id}/activities`}
+              method="post"
+            >
+              <label>
+                Contact
+                <select name="contactId" defaultValue={lifecycle.primaryContactId ?? ""}>
+                  <option value="">No contact / internal note</option>
+                  {contacts.map((contact) => (
+                    <option key={contact.id} value={contact.id}>
+                      {contact.name}
+                      {contact.position ? ` · ${contact.position}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Activity
+                <select name="activityType" defaultValue="OUTREACH">
+                  <option value="OUTREACH">Initial outreach</option>
+                  <option value="FOLLOW_UP">Follow-up</option>
+                  <option value="REPLY">Reply received</option>
+                  <option value="MEETING">Meeting</option>
+                  <option value="PROPOSAL">Proposal</option>
+                  <option value="NOTE">Internal note</option>
+                </select>
+              </label>
+              <label>
+                Channel
+                <select name="channel" defaultValue="EMAIL">
+                  <option value="EMAIL">Email</option>
+                  <option value="PHONE">Phone</option>
+                  <option value="LINKEDIN">LinkedIn</option>
+                  <option value="MEETING">Meeting</option>
+                  <option value="OTHER">Other</option>
+                  <option value="INTERNAL">Internal</option>
+                </select>
+              </label>
+              <label>
+                Direction
+                <select name="direction" defaultValue="OUTBOUND">
+                  <option value="OUTBOUND">Outbound</option>
+                  <option value="INBOUND">Inbound</option>
+                  <option value="INTERNAL">Internal</option>
+                </select>
+              </label>
+              <label>
+                Status
+                <select name="activityStatus" defaultValue="COMPLETED">
+                  <option value="PLANNED">Planned</option>
+                  <option value="SENT">Sent</option>
+                  <option value="COMPLETED">Completed</option>
+                  <option value="REPLIED">Replied</option>
+                  <option value="NO_RESPONSE">No response</option>
+                  <option value="CANCELLED">Cancelled</option>
+                </select>
+              </label>
+              <label>
+                Follow-up number
+                <select name="followUpSequence" defaultValue="0">
+                  <option value="0">Not a follow-up</option>
+                  <option value="1">Follow-up 1</option>
+                  <option value="2">Follow-up 2</option>
+                  <option value="3">Final follow-up</option>
+                </select>
+              </label>
+              <label className="span-2">
+                Subject
+                <input name="subject" />
+              </label>
+              <label className="span-2">
+                Summary
+                <textarea
+                  name="summary"
+                  placeholder="What happened? Keep this factual."
+                />
+              </label>
+              <label>
+                Next action date
+                <input name="nextActionAt" type="datetime-local" />
+              </label>
+              <div className="m4-compliance-note">
+                Outbound activity is blocked for contacts marked Uncertain,
+                Do Not Contact or Unsubscribed.
+              </div>
+              <button className="primary-button" type="submit">
+                Record activity
+              </button>
+            </form>
+          </div>
+
+          {salesActivities.length > 0 ? (
+            <div className="m4-activity-list">
+              {salesActivities.map((activity) => (
+                <article key={activity.id}>
+                  <div>
+                    <strong>
+                      {activity.activityType.replaceAll("_", " ")}
+                      {activity.contactName ? ` · ${activity.contactName}` : ""}
+                    </strong>
+                    <span>
+                      {activity.channel} · {activity.direction} ·{" "}
+                      {activity.actorName ?? "System"} ·{" "}
+                      {new Date(activity.createdAt).toLocaleString("en-AU")}
+                    </span>
+                  </div>
+                  <p>{activity.summary || activity.subject || "No summary"}</p>
+                  {activity.followUpSequence > 0 ? (
+                    <small>
+                      Follow-up {activity.followUpSequence}
+                      {activity.followUpSequence === 3 ? " · final follow-up" : ""}
+                    </small>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : null}
+        </details>
+
+        {salesOutcome ? (
+          <section className="m4-reality-card">
+            <div>
+              <div className="eyebrow">Prediction vs reality</div>
+              <h3>
+                {salesOutcome.outcome === "WON"
+                  ? "Won deal"
+                  : "Lost opportunity"}
+              </h3>
+              <p>
+                Closed {new Date(salesOutcome.closedAt).toLocaleDateString("en-AU")}
+                {salesOutcome.salesCycleDays !== null
+                  ? ` · ${salesOutcome.salesCycleDays} day sales cycle`
+                  : ""}
+              </p>
+            </div>
+            <div className="m4-reality-grid">
+              <div>
+                <span>Originally predicted deal</span>
+                <strong>
+                  {salesOutcome.predictedDealValue !== null
+                    ? money(salesOutcome.predictedDealValue)
+                    : "Unknown"}
+                </strong>
+              </div>
+              <div>
+                <span>Originally predicted probability</span>
+                <strong>
+                  {salesOutcome.predictedConversionProbability !== null
+                    ? `${Math.round(
+                        salesOutcome.predictedConversionProbability * 1000,
+                      ) / 10}%`
+                    : "Unknown"}
+                </strong>
+              </div>
+              <div>
+                <span>Originally expected revenue</span>
+                <strong>
+                  {salesOutcome.predictedExpectedRevenue !== null
+                    ? money(salesOutcome.predictedExpectedRevenue)
+                    : "Unknown"}
+                </strong>
+              </div>
+              <div>
+                <span>Actual contract</span>
+                <strong>
+                  {salesOutcome.outcome === "WON" &&
+                  salesOutcome.actualContractValue !== null
+                    ? money(salesOutcome.actualContractValue)
+                    : salesOutcome.outcome}
+                </strong>
+              </div>
+            </div>
+            <div className="m4-reality-notes">
+              {predictionDelta?.dealDelta !== null &&
+              predictionDelta?.dealDelta !== undefined ? (
+                <p>
+                  Deal-value delta:{" "}
+                  <strong>
+                    {predictionDelta.dealDelta >= 0 ? "+" : ""}
+                    {money(predictionDelta.dealDelta)}
+                  </strong>
+                </p>
+              ) : null}
+              {salesOutcome.outcome === "LOST" ? (
+                <p>
+                  Lost reason:{" "}
+                  <strong>
+                    {salesOutcome.lostReason?.replaceAll("_", " ") ?? "Unknown"}
+                  </strong>
+                  {salesOutcome.lostReasonNote
+                    ? ` · ${salesOutcome.lostReasonNote}`
+                    : ""}
+                </p>
+              ) : (
+                <p>
+                  Actual Offering:{" "}
+                  <strong>{salesOutcome.actualOfferingName ?? "Unknown"}</strong>
+                  {salesOutcome.primaryContactName
+                    ? ` · Primary contact: ${salesOutcome.primaryContactName}`
+                    : ""}
+                </p>
+              )}
+              <p>{salesOutcome.recommendationSource}</p>
+            </div>
+          </section>
+        ) : null}
+      </section>
+
       <section className="triage-hero">
         <div className="triage-main">
           <div className="triage-label-row">
