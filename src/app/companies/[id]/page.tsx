@@ -32,6 +32,7 @@ import {
   type OpportunityOverride,
 } from "@/lib/opportunities/service";
 import {
+  lifecycleStages,
   predictionRealityDelta,
   recommendContact,
   type ContactForRecommendation,
