@@ -800,6 +800,26 @@ export default async function CompanyIntelligencePage({
           Human override cleared. Opportunity ranking now uses the model output again.
         </div>
       ) : null}
+      {query.contact ? (
+        <div className="success-banner">
+          Contact {query.contact === "updated" ? "updated" : "created"}.
+        </div>
+      ) : null}
+      {query.activity ? (
+        <div className="success-banner">
+          Sales activity recorded and lifecycle progress reassessed.
+        </div>
+      ) : null}
+      {query.lifecycle === "saved" ? (
+        <div className="success-banner">
+          Sales lifecycle, owner and next action saved.
+        </div>
+      ) : null}
+      {query.lifecycle === "closed" ? (
+        <div className="success-banner">
+          Final sales outcome saved with prediction-vs-reality data.
+        </div>
+      ) : null}
 
       <section className="ai-research-card">
         <div className="ai-research-heading">
