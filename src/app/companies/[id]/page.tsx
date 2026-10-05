@@ -844,6 +844,10 @@ export default async function CompanyIntelligencePage({
                 {Math.round(effectiveOpportunity.effectiveConversionProbability * 1000) / 10}% ×{" "}
                 {money(effectiveOpportunity.effectiveDealValue)}
               </small>
+              <small>
+                Model range {money(effectiveOpportunity.expectedRevenueLow)} –{" "}
+                {money(effectiveOpportunity.expectedRevenueHigh)}
+              </small>
             </div>
             <div>
               <span>Estimated deal value</span>
