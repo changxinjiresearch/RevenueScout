@@ -73,7 +73,7 @@ async function loadIcpContext(
 ): Promise<DiscoveryIcpContext | null> {
   if (!icpId) return null;
   const sql = db();
-  const [row] = await sql<IcpRow[]>\`
+  const [row] = await sql<IcpRow[]>`
     SELECT
       countries,
       states,
@@ -86,10 +86,10 @@ async function loadIcpContext(
       company_age_max AS "companyAgeMax",
       company_types AS "companyTypes"
     FROM icps
-    WHERE id = \${icpId}
-      AND organization_id = \${organizationId}
+    WHERE id = ${icpId}
+      AND organization_id = ${organizationId}
     LIMIT 1
-  \`;
+  `;
 
   return row ?? null;
 }
@@ -214,7 +214,7 @@ export async function POST(
   const { id } = await params;
   const sql = db();
 
-  const [run] = await sql<RunRow[]>\`
+  const [run] = await sql<RunRow[]>`
     SELECT
       id,
       query,
@@ -225,10 +225,10 @@ export async function POST(
       work_state AS "workState",
       icp_id AS "icpId"
     FROM discovery_runs
-    WHERE id = \${id}
-      AND organization_id = \${user.organizationId}
+    WHERE id = ${id}
+      AND organization_id = ${user.organizationId}
     LIMIT 1
-  \`;
+  `;
 
   if (!run) {
     return NextResponse.json({ error: "Discovery run not found." }, { status: 404 });
@@ -277,18 +277,18 @@ export async function POST(
     const completed = state.stage === "COMPLETE";
     const progress = discoveryProgress(state, results.length);
 
-    await sql\`
+    await sql`
       UPDATE discovery_runs
       SET
-        status = \${completed ? "COMPLETED" : "RUNNING"},
-        result_count = \${results.length},
-        results = \${JSON.stringify(results)}::text::jsonb,
-        work_state = \${JSON.stringify(state)}::text::jsonb,
-        progress = \${JSON.stringify(progress)}::text::jsonb,
-        completed_at = \${completed ? new Date() : null}
-      WHERE id = \${run.id}
-        AND organization_id = \${user.organizationId}
-    \`;
+        status = ${completed ? "COMPLETED" : "RUNNING"},
+        result_count = ${results.length},
+        results = ${JSON.stringify(results)}::text::jsonb,
+        work_state = ${JSON.stringify(state)}::text::jsonb,
+        progress = ${JSON.stringify(progress)}::text::jsonb,
+        completed_at = ${completed ? new Date() : null}
+      WHERE id = ${run.id}
+        AND organization_id = ${user.organizationId}
+    `;
 
     return NextResponse.json({
       status: completed ? "COMPLETED" : "RUNNING",
@@ -299,15 +299,15 @@ export async function POST(
     const message =
       error instanceof Error ? error.message : "Discovery advance failed.";
 
-    await sql\`
+    await sql`
       UPDATE discovery_runs
       SET
         status = 'FAILED',
-        error_message = \${message},
+        error_message = ${message},
         completed_at = NOW()
-      WHERE id = \${run.id}
-        AND organization_id = \${user.organizationId}
-    \`;
+      WHERE id = ${run.id}
+        AND organization_id = ${user.organizationId}
+    `;
 
     return NextResponse.json({ error: message }, { status: 500 });
   }
