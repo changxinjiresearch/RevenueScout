@@ -239,7 +239,7 @@ export default async function DiscoverPage({
             </p>
           </div>
 
-          {run.status === "RUNNING" ? (
+          {run.progress ? (
             <DiscoveryProgress
               runId={run.id}
               initialStatus={run.status}
