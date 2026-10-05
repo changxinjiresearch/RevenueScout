@@ -109,6 +109,10 @@ const LOGISTICS_DIRECTORIES: DirectoryDefinition[] = [
 
 const pagePromiseCache = new Map<string, Promise<string | null>>();
 
+export function resetIndustryDirectoryPageCacheForTests(): void {
+  pagePromiseCache.clear();
+}
+
 function decodeEntities(value: string): string {
   return value
     .replace(/&nbsp;/gi, " ")
