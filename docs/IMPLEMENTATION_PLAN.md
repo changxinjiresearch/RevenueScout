@@ -163,7 +163,7 @@ Status: **completed**
 - Recommended Contact resolved from the M3 role target using title fit, decision relevance, contactability and evidence quality
 - explicit Why This Person explanation
 - contactability / compliance states
-- outbound activity blocked for Uncertain, Do Not Contact and Unsubscribed contacts
+- outbound activity allowed only for explicit Contact Permitted, Existing Relationship or User-confirmed Consent states; a public business address alone is not treated as permission
 - opportunity owner assignment to workspace members
 - complete lifecycle stages: Discovered, Qualified, Ready to Contact, Contacted, Replied, Meeting, Opportunity, Proposal, Won, Lost, Not Fit, Do Not Contact and Suppressed
 - structured activity records for Outreach, Follow-up, Reply, Meeting, Proposal and internal Notes
