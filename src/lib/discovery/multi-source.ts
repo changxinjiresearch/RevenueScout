@@ -82,8 +82,8 @@ function jaccardNameSimilarity(a: string, b: string): number {
   return union > 0 ? intersection / union : 0;
 }
 
-function mergeStringArrays(a: string[] = [], b: string[] = []): string[] {
-  return [...new Set([...a, ...b].filter(Boolean))];
+function mergeStringArrays(...groups: Array<string[] | undefined>): string[] {
+  return [...new Set(groups.flatMap((group) => group ?? []).filter(Boolean))];
 }
 
 function mergeIdentifiers(
