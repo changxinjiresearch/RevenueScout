@@ -233,3 +233,10 @@ Status: **completed**
 - Analytics is a first-class production navigation surface
 
 Exit gate: **passed**. The business can see whether RevenueScout recommendations actually create revenue, identify which signals / ICPs / Offerings are associated with outcomes, and measure M3 prediction error against real M4 Won/Lost ground truth without silently rewriting historical predictions.
+
+
+## Core MVP status
+
+M0 through M6 have passed their exit gates. The core MVP is complete. Further
+model optimisation should be driven by accumulated real Won/Lost outcomes and
+versioned explicitly rather than silently changing historical predictions.
