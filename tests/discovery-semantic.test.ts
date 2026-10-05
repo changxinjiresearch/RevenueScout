@@ -64,7 +64,7 @@ function candidate(input: {
         verificationStatus: "LIKELY",
         sourceFamily: input.sourceFamily,
         matchedSemantics: ["logistics"],
-        supportsIndustry: true,
+        supportsIndustry: input.provider === "WIKIDATA",
       },
     ],
     matchedSemantics: ["logistics"],
@@ -116,7 +116,7 @@ describe("semantic discovery", () => {
     ).toBeNull();
   });
 
-  it("accepts industry relevance only after two independent source families agree", () => {
+  it("does not treat a GLEIF legal-name keyword as independent industry proof", () => {
     const merged = dedupeDiscoveryCandidates([
       candidate({
         provider: "GLEIF",
@@ -136,11 +136,54 @@ describe("semantic discovery", () => {
       }),
     ])[0];
 
+    expect(
+      industryValidationForCandidate(merged, "logistics"),
+    ).toBeNull();
+  });
+
+  it("accepts industry relevance after two true industry source families agree", () => {
+    const merged = dedupeDiscoveryCandidates([
+      candidate({
+        provider: "GLEIF",
+        id: "LEI-3",
+        name: "Verified Freight Pty Ltd",
+        country: "AU",
+        domain: "verifiedfreight.com.au",
+        sourceFamily: "gleif.org",
+      }),
+      candidate({
+        provider: "WIKIDATA",
+        id: "Q3",
+        name: "Verified Freight",
+        country: "AU",
+        domain: "verifiedfreight.com.au",
+        sourceFamily: "wikidata.org",
+      }),
+    ])[0];
+
+    merged.sourceEvidence = [
+      ...(merged.sourceEvidence ?? []),
+      {
+        provider: "OFFICIAL_WEBSITE",
+        providerRecordId: null,
+        sourceUrl: "https://verifiedfreight.com.au/services",
+        sourceLabel: "Verified official company website",
+        excerpt: "Freight forwarding, warehousing and distribution services.",
+        observedAt: "2026-10-05T00:00:00.000Z",
+        confidence: 0.95,
+        verificationStatus: "CONFIRMED",
+        sourceFamily: "official:verifiedfreight.com.au",
+        matchedSemantics: ["freight", "warehousing", "distribution"],
+        supportsIndustry: true,
+      },
+    ];
+
     const validation = industryValidationForCandidate(merged, "logistics");
 
     expect(validation).not.toBeNull();
     expect(validation?.independentSupportingFamilyCount).toBe(2);
     expect(validation?.status).toBe("CORROBORATED");
+    expect(merged.sourceEvidence).toHaveLength(3);
   });
 
   it("deduplicates the same company across providers and retains provenance", () => {
