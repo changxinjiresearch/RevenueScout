@@ -34,6 +34,7 @@ type CompanyListItem = {
   latestSignalAt: Date | null;
   signalTypes: string[];
   watched: boolean;
+  suppressed: boolean;
   searchText: string;
   updatedAt: Date;
 };
@@ -128,6 +129,15 @@ export default async function CompaniesPage({
       sig."latestSignalAt",
       COALESCE(sig."signalTypes", ARRAY[]::text[]) AS "signalTypes",
       (w.company_id IS NOT NULL) AS watched,
+      EXISTS (
+        SELECT 1
+        FROM suppression_entries sup
+        WHERE sup.organization_id = c.organization_id
+          AND sup.company_id = c.id
+          AND sup.scope = 'COMPANY'
+          AND sup.active = TRUE
+          AND (sup.expires_at IS NULL OR sup.expires_at > NOW())
+      ) AS suppressed,
       LOWER(CONCAT_WS(
         ' ',
         c.display_name,
@@ -524,6 +534,7 @@ export default async function CompaniesPage({
                         <strong>{company.displayName}</strong>
                       </Link>
                       {company.watched ? <span>Watching</span> : null}
+                      {company.suppressed ? <span>Suppressed</span> : null}
                     </div>
                     <p>
                       {company.industry ?? "Industry unknown"} ·{" "}
