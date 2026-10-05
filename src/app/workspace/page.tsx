@@ -90,7 +90,9 @@ export default async function WorkspacePage({
         <div className="nav-links">
           <Link href="/">Today</Link>
           <Link href="/discover">Discover</Link>
-          <Link href="/companies">Companies</Link>
+          <Link href="/companies">Search</Link>
+          <Link href="/watchlist">Watchlist</Link>
+          <Link href="/compliance">Compliance</Link>
           <Link href="/setup">Market Setup</Link>
           <Link className="nav-active" href="/workspace">Workspace</Link>
         </div>
