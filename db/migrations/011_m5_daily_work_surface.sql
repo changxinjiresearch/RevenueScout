@@ -33,6 +33,7 @@ CREATE TABLE IF NOT EXISTS suppression_entries (
   source TEXT NOT NULL DEFAULT 'USER',
   note TEXT NOT NULL DEFAULT '',
   previous_lifecycle_stage TEXT,
+  previous_relationship_status TEXT,
   active BOOLEAN NOT NULL DEFAULT TRUE,
   expires_at TIMESTAMPTZ,
   created_by UUID REFERENCES users(id) ON DELETE SET NULL,
