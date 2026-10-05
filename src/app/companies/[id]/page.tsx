@@ -202,6 +202,37 @@ function claimStatusText(status: string) {
   return "Unknown";
 }
 
+function lifecycleLabel(stage: LifecycleStage): string {
+  return stage
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function datetimeLocalValue(value: Date | null): string {
+  if (!value) return "";
+  const date = new Date(value);
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+}
+
+function contactabilityLabel(status: ContactabilityStatus): string {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
+function decisionRelevanceLabel(status: DecisionRelevance): string {
+  return status
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ");
+}
+
 function money(value: number): string {
   return new Intl.NumberFormat("en-AU", {
     style: "currency",
