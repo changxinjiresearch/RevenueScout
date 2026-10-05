@@ -3567,3 +3567,35 @@ select {
     width: 100%;
   }
 }
+
+
+.m5-card-action-area {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+.m5-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.m5-inline-state {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: #eef8f2;
+  color: #3f6f4c;
+  font-size: 9px;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+@media (max-width: 760px) {
+  .m5-card-action-area {
+    flex-direction: column;
+  }
+}
