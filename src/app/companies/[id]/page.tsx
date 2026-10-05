@@ -145,6 +145,7 @@ type SalesOutcomeView = {
   predictedDealValue: number | null;
   predictedExpectedRevenue: number | null;
   actualContractValue: number | null;
+  actualOfferingId: string | null;
   actualOfferingName: string | null;
   primaryContactName: string | null;
   lostReason: string | null;
@@ -624,6 +625,7 @@ export default async function CompanyIntelligencePage({
           o.predicted_deal_value::float8 AS "predictedDealValue",
           o.predicted_expected_revenue::float8 AS "predictedExpectedRevenue",
           o.actual_contract_value::float8 AS "actualContractValue",
+          o.actual_offering_id AS "actualOfferingId",
           offering.name AS "actualOfferingName",
           contact.name AS "primaryContactName",
           o.lost_reason AS "lostReason",
@@ -1523,7 +1525,10 @@ export default async function CompanyIntelligencePage({
             </label>
             <label>
               Actual Offering if Won/Lost
-              <select name="actualOfferingId" defaultValue="">
+              <select
+                name="actualOfferingId"
+                defaultValue={salesOutcome?.actualOfferingId ?? ""}
+              >
                 <option value="">Use current/model Offering</option>
                 {offerings.map((offering) => (
                   <option key={offering.id} value={offering.id}>
@@ -1539,12 +1544,16 @@ export default async function CompanyIntelligencePage({
                 type="number"
                 min="0"
                 step="1"
+                defaultValue={salesOutcome?.actualContractValue ?? ""}
                 placeholder="e.g. 28500"
               />
             </label>
             <label>
               Lost reason · required for Lost
-              <select name="lostReason" defaultValue="">
+              <select
+                name="lostReason"
+                defaultValue={salesOutcome?.lostReason ?? ""}
+              >
                 <option value="">Select only when Lost</option>
                 <option value="NO_BUDGET">No budget</option>
                 <option value="NO_NEED">No need</option>
@@ -1563,6 +1572,7 @@ export default async function CompanyIntelligencePage({
               Lost reason note
               <input
                 name="lostReasonNote"
+                defaultValue={salesOutcome?.lostReasonNote ?? ""}
                 placeholder="Optional context for future learning"
               />
             </label>
