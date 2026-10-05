@@ -116,7 +116,7 @@ describe("semantic discovery", () => {
     ).toBeNull();
   });
 
-  it("does not treat a GLEIF legal-name keyword as independent industry proof", () => {
+  it("keeps GLEIF as identity evidence while allowing an independent semantic source to support industry", () => {
     const merged = dedupeDiscoveryCandidates([
       candidate({
         provider: "GLEIF",
@@ -136,9 +136,45 @@ describe("semantic discovery", () => {
       }),
     ])[0];
 
-    expect(
-      industryValidationForCandidate(merged, "logistics"),
-    ).toBeNull();
+    const validation = industryValidationForCandidate(merged, "logistics");
+
+    expect(validation).not.toBeNull();
+    expect(validation?.independentSupportingFamilyCount).toBe(1);
+    expect(validation?.status).toBe("SUPPORTED");
+  });
+
+  it("accepts a verified official industry source plus independent legal identity", () => {
+    const result = candidate({
+      provider: "GLEIF",
+      id: "LEI-OFFICIAL",
+      name: "Official Freight Pty Ltd",
+      country: "AU",
+      domain: "officialfreight.com.au",
+      sourceFamily: "gleif.org",
+    });
+
+    result.sourceEvidence = [
+      ...(result.sourceEvidence ?? []),
+      {
+        provider: "OFFICIAL_WEBSITE",
+        providerRecordId: null,
+        sourceUrl: "https://officialfreight.com.au/services",
+        sourceLabel: "Verified official company website",
+        excerpt: "Australian freight forwarding and warehousing services.",
+        observedAt: "2026-10-05T00:00:00.000Z",
+        confidence: 0.95,
+        verificationStatus: "CONFIRMED",
+        sourceFamily: "official:officialfreight.com.au",
+        matchedSemantics: ["freight", "warehousing"],
+        supportsIndustry: true,
+      },
+    ];
+
+    const validation = industryValidationForCandidate(result, "logistics");
+
+    expect(validation).not.toBeNull();
+    expect(validation?.status).toBe("SUPPORTED");
+    expect(validation?.independentSupportingFamilyCount).toBe(1);
   });
 
   it("accepts industry relevance after two true industry source families agree", () => {
