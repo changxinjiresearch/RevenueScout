@@ -152,21 +152,16 @@ export async function POST(request: NextRequest) {
         )
         VALUES (
           ${user.organizationId},
-          ${scope === "COMPANY" ? companyId : null},
-          ${scope === "CONTACT" ? contactId : null},
-          ${scope},
-          ${reason},
-          'USER',
-          ${note},
-          ${scope === "COMPANY"
-            ? sql`
-                (SELECT stage
-                 FROM company_sales_lifecycle
-                 WHERE organization_id = ${user.organizationId}
-                   AND company_id = ${companyId}
-                 LIMIT 1)
-              `
-            : null},
+          CASE
+            WHEN ${scope} = 'COMPANY' THEN (
+              SELECT stage
+              FROM company_sales_lifecycle
+              WHERE organization_id = ${user.organizationId}
+                AND company_id = ${companyId}
+              LIMIT 1
+            )
+            ELSE NULL
+          END,
           TRUE,
           ${user.id}
         )
