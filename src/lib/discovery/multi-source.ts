@@ -145,11 +145,14 @@ function providerEvidence(
     sourceFamily:
       candidate.provider === "WIKIDATA" ? "wikidata.org" : "gleif.org",
     matchedSemantics: matched,
-    supportsIndustry: matched.length > 0,
+    // GLEIF proves legal identity. A semantic word in a legal name is useful
+    // discovery evidence, but it is not an independent industry classification.
+    supportsIndustry:
+      candidate.provider === "WIKIDATA" && matched.length > 0,
   };
 }
 
-function candidateWithEvidence(
+export function candidateWithEvidence(
   candidate: DiscoveryCandidate,
   semantics: string[],
 ): DiscoveryCandidate {
@@ -307,16 +310,17 @@ async function mapWithConcurrency<T, R>(
   return output;
 }
 
-async function addOfficialWebsiteEvidence(
+export async function addOfficialWebsiteEvidence(
   candidate: DiscoveryCandidate,
   semantics: string[],
 ): Promise<DiscoveryCandidate> {
-  const existingFamilies = new Set(
-    (candidate.sourceEvidence ?? [])
-      .filter((item) => item.supportsIndustry)
-      .map((item) => item.sourceFamily),
-  );
-  if (existingFamilies.size >= 2) return candidate;
+  if (
+    (candidate.sourceEvidence ?? []).some(
+      (item) => item.provider === "OFFICIAL_WEBSITE",
+    )
+  ) {
+    return candidate;
+  }
 
   try {
     const collected = await collectPublicPages({
@@ -325,6 +329,7 @@ async function addOfficialWebsiteEvidence(
       website: candidate.website,
       domain: candidate.domain,
       maxPages: 3,
+      allowDomainGuess: false,
     });
 
     if (!collected.officialWebsite || collected.pages.length === 0) {
@@ -416,7 +421,7 @@ export function industryValidationForCandidate(
   };
 }
 
-function canonicalRecordId(candidate: DiscoveryCandidate): string {
+export function canonicalRecordId(candidate: DiscoveryCandidate): string {
   const identifiers = candidate.providerIdentifiers ?? [];
   if (identifiers.length > 0) {
     return identifiers
@@ -429,6 +434,36 @@ function canonicalRecordId(candidate: DiscoveryCandidate): string {
     normaliseDomain(candidate.domain ?? candidate.website) ||
     nameCountryKey(candidate)
   );
+}
+
+export function finalizeValidatedCandidate(
+  candidate: DiscoveryCandidate,
+  query: string,
+): DiscoveryCandidate | null {
+  const validation = industryValidationForCandidate(candidate, query);
+  if (!validation) return null;
+
+  const sourceEvidence = candidate.sourceEvidence ?? [];
+  const primarySource =
+    sourceEvidence.find((item) => item.provider === "GLEIF") ??
+    sourceEvidence.find((item) => item.provider === "WIKIDATA") ??
+    sourceEvidence[0];
+
+  const verificationStatus: DiscoveryCandidate["verificationStatus"] =
+    validation.status === "CONFIRMED" ? "CONFIRMED" : "LIKELY";
+
+  return {
+    ...candidate,
+    provider: "MULTI_SOURCE",
+    providerRecordId: canonicalRecordId(candidate),
+    industry: canonicalIndustryLabel(query),
+    sourceUrl: primarySource?.sourceUrl ?? candidate.sourceUrl,
+    sourceLabel: "Multi-source semantic validation",
+    sourceConfidence: validation.confidence,
+    verificationStatus,
+    industryValidation: validation,
+    matchedSemantics: validation.matchedSemantics,
+  };
 }
 
 export async function searchMultiSource(
@@ -471,34 +506,9 @@ export async function searchMultiSource(
     (candidate) => addOfficialWebsiteEvidence(candidate, semantics),
   );
 
-  const validated: DiscoveryCandidate[] = [];
-
-  for (const candidate of enriched) {
-    const validation = industryValidationForCandidate(candidate, query.query);
-    if (!validation) continue;
-
-    const sourceEvidence = candidate.sourceEvidence ?? [];
-    const primarySource =
-      sourceEvidence.find((item) => item.provider === "GLEIF") ??
-      sourceEvidence.find((item) => item.provider === "WIKIDATA") ??
-      sourceEvidence[0];
-
-    const verificationStatus: DiscoveryCandidate["verificationStatus"] =
-      validation.status === "CONFIRMED" ? "CONFIRMED" : "LIKELY";
-
-    validated.push({
-      ...candidate,
-      provider: "MULTI_SOURCE",
-      providerRecordId: canonicalRecordId(candidate),
-      industry: canonicalIndustryLabel(query.query),
-      sourceUrl: primarySource?.sourceUrl ?? candidate.sourceUrl,
-      sourceLabel: "Multi-source semantic validation",
-      sourceConfidence: validation.confidence,
-      verificationStatus,
-      industryValidation: validation,
-      matchedSemantics: validation.matchedSemantics,
-    });
-  }
+  const validated = enriched
+    .map((candidate) => finalizeValidatedCandidate(candidate, query.query))
+    .filter((candidate): candidate is DiscoveryCandidate => candidate !== null);
 
   return validated.sort((a, b) => {
     const confidenceDelta =
