@@ -886,6 +886,36 @@ export default async function AnalyticsPage({
         </article>
       </section>
 
+      <section className="m6-two-column m6-top-opportunities">
+        <section className="setup-section">
+          <div className="setup-section-heading">
+            <div>
+              <span className="step-number">A</span>
+              <h2>Most valuable open opportunities</h2>
+            </div>
+            <p>Ranked by current probability-adjusted Expected Revenue.</p>
+          </div>
+          <TopOpportunityList rows={topRevenueRows.slice(0, 5)} mode="revenue" />
+        </section>
+
+        <section className="setup-section">
+          <div className="setup-section-heading">
+            <div>
+              <span className="step-number">B</span>
+              <h2>Most likely to convert</h2>
+            </div>
+            <p>
+              Ranked by current conversion probability; this remains
+              pre-calibration until enough Won/Lost ground truth exists.
+            </p>
+          </div>
+          <TopOpportunityList
+            rows={topProbabilityRows.slice(0, 5)}
+            mode="probability"
+          />
+        </section>
+      </section>
+
       <section className="setup-section">
         <div className="setup-section-heading">
           <div>
@@ -1341,6 +1371,53 @@ export default async function AnalyticsPage({
         )}
       </section>
     </main>
+  );
+}
+
+function TopOpportunityList({
+  rows,
+  mode,
+}: {
+  rows: TopOpportunityRow[];
+  mode: "revenue" | "probability";
+}) {
+  if (rows.length === 0) {
+    return <EmptyAnalytics text="No active M3 opportunities are available." />;
+  }
+
+  return (
+    <div className="m6-top-list">
+      {rows.map((row, index) => (
+        <article key={row.companyId}>
+          <span className="m6-rank">#{index + 1}</span>
+          <div className="m6-top-company">
+            <Link href={`/companies/${row.companyId}`}>
+              <strong>{row.companyName}</strong>
+            </Link>
+            <span>
+              {label(row.stage)} · {row.ownerName ?? "Unassigned"}
+            </span>
+            <small>
+              {row.matchedIcpName ?? "ICP unknown"} ·{" "}
+              {row.offeringName ?? "Offering unknown"}
+            </small>
+          </div>
+          <div className="m6-top-value">
+            <strong>
+              {mode === "revenue"
+                ? money(row.expectedRevenue)
+                : percent(row.conversionProbability)}
+            </strong>
+            <span>
+              {mode === "revenue"
+                ? `${percent(row.conversionProbability)} probability`
+                : `${money(row.expectedRevenue)} expected`}
+            </span>
+            <small>{money(row.dealValue)} deal</small>
+          </div>
+        </article>
+      ))}
+    </div>
   );
 }
 
