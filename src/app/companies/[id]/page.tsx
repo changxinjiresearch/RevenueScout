@@ -893,7 +893,7 @@ export default async function CompanyIntelligencePage({
             <div>
               <span className="field-label">Recommended Offering</span>
               <p><strong>{effectiveOpportunity.effectiveOfferingName}</strong></p>
-              <small>{effectiveOpportunity.offeringReason}</small>
+              <small>{effectiveOpportunity.effectiveOfferingReason}</small>
             </div>
           </div>
 
