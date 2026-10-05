@@ -71,9 +71,14 @@ export async function POST(request: NextRequest) {
   await sql.begin(async (tx) => {
     if (action === "clear") {
       const [activeSuppression] = await tx<
-        { previousLifecycleStage: string | null }[]
+        {
+          previousLifecycleStage: string | null;
+          previousRelationshipStatus: string | null;
+        }[]
       >`
-        SELECT previous_lifecycle_stage AS "previousLifecycleStage"
+        SELECT
+          previous_lifecycle_stage AS "previousLifecycleStage",
+          previous_relationship_status AS "previousRelationshipStatus"
         FROM suppression_entries
         WHERE organization_id = ${user.organizationId}
           AND active = TRUE
@@ -130,7 +135,12 @@ export async function POST(request: NextRequest) {
 
         await tx`
           UPDATE companies
-          SET relationship_status = 'NONE', updated_at = NOW()
+          SET
+            relationship_status = COALESCE(
+              ${activeSuppression?.previousRelationshipStatus ?? null},
+              'NONE'
+            ),
+            updated_at = NOW()
           WHERE id = ${companyId}
             AND organization_id = ${user.organizationId}
             AND relationship_status = 'UNSUBSCRIBED'
@@ -147,6 +157,7 @@ export async function POST(request: NextRequest) {
           source,
           note,
           previous_lifecycle_stage,
+          previous_relationship_status,
           active,
           created_by
         )
@@ -158,6 +169,16 @@ export async function POST(request: NextRequest) {
               FROM company_sales_lifecycle
               WHERE organization_id = ${user.organizationId}
                 AND company_id = ${companyId}
+              LIMIT 1
+            )
+            ELSE NULL
+          END,
+          CASE
+            WHEN ${scope} = 'COMPANY' THEN (
+              SELECT relationship_status
+              FROM companies
+              WHERE organization_id = ${user.organizationId}
+                AND id = ${companyId}
               LIMIT 1
             )
             ELSE NULL
